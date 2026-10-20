@@ -4,6 +4,14 @@ import type { StorageProvider } from "./types";
 
 let provider: StorageProvider | null = null;
 
+/** Raised when the storage backend is not usable. The message is safe to show. */
+export class StorageConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageConfigurationError";
+  }
+}
+
 /**
  * Picks the storage backend from the environment:
  *   STORAGE_PROVIDER=r2    -> Cloudflare R2 (S3 compatible)
@@ -24,7 +32,20 @@ export function getStorage(): StorageProvider {
       process.env.R2_BUCKET_NAME,
   );
 
+  if (configured === "r2" && !hasR2) {
+    throw new StorageConfigurationError(
+      "STORAGE_PROVIDER is set to r2 but the R2 credentials are missing. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME.",
+    );
+  }
+
   if (configured === "local" || (!configured && !hasR2)) {
+    // On Vercel the filesystem is read-only, so the local backend cannot
+    // possibly work. Failing with a clear message beats a confusing 500.
+    if (!configured && process.env.VERCEL) {
+      throw new StorageConfigurationError(
+        "Cloudflare R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME in the Vercel project settings, then redeploy.",
+      );
+    }
     provider = createLocalProvider();
   } else {
     provider = createR2Provider();

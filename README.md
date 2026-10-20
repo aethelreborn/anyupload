@@ -165,15 +165,26 @@ Environment Variables**.
 
 ## 5. Point darkie.dpdns.org at Vercel
 
+`darkie.dpdns.org` is delegated to Cloudflare's nameservers
+(`gemma.ns.cloudflare.com`), so the DNS record is added in the **Cloudflare
+dashboard**, not at dpdns.org.
+
 1. In Vercel: **Project → Settings → Domains → Add** → `darkie.dpdns.org`.
    Vercel shows you the target, usually `cname.vercel-dns.com`.
-2. In the dpdns.org panel that manages `darkie.dpdns.org`, set the record to
-   **CNAME** → `cname.vercel-dns.com`.
+2. In Cloudflare: **Websites → darkie.dpdns.org → DNS → Add record**
+   - Type: **CNAME**
+   - Name: `darkie`
+   - Target: `cname.vercel-dns.com`
+   - Proxy status: **DNS only** (grey cloud) — proxied records do not work
+     with Vercel's domain verification.
 3. Wait for the certificate. Vercel provisions HTTPS automatically once DNS
    resolves.
 
 If dpdns.org only offers A records, use the A record Vercel gives you instead
-(and keep the CNAME as a fallback).
+and keep the CNAME as a fallback.
+
+Until the CNAME exists the name does not resolve at all, so nothing works
+until step 2 is done.
 
 ---
 
@@ -240,6 +251,12 @@ set, deletion is disabled entirely.
 The bucket CORS policy is missing or does not include your origin. Re-run
 `npm run r2:setup`, or edit the policy in the dashboard. Remember to include
 `http://localhost:3000` while developing.
+
+**"Cloudflare R2 is not configured"**
+The R2 environment variables are not set on the deployment. The app refuses to
+fall back to local storage on Vercel (the filesystem is read-only there) and
+says so instead of failing with a confusing error. Add the four variables and
+redeploy.
 
 **"Upload failed with status 400 / SignatureDoesNotMatch"**
 The `Content-Type` sent by the browser does not match the one that was signed.

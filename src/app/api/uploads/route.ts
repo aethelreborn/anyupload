@@ -1,6 +1,6 @@
 import { listUploads } from "@/lib/uploads";
 import { getStorage } from "@/lib/storage";
-import { fail, isNextControlFlowError, json } from "@/lib/http";
+import { fail, configurationErrorMessage, isNextControlFlowError, json } from "@/lib/http";
 
 export async function GET(request: Request) {
   try {
@@ -39,6 +39,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (isNextControlFlowError(error)) throw error;
     console.error("[GET /api/uploads]", error);
-    return fail("Could not list uploads.", 500);
+    const config = configurationErrorMessage(error);
+    return fail(config ?? "Could not list uploads.", config ? 503 : 500);
   }
 }

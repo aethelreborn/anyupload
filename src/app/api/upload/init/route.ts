@@ -1,6 +1,6 @@
 import { getStorage } from "@/lib/storage";
 import { buildKey, guessMime } from "@/lib/uploads";
-import { fail, isNextControlFlowError, json, newId, readJson } from "@/lib/http";
+import { fail, configurationErrorMessage, isNextControlFlowError, json, newId, readJson } from "@/lib/http";
 
 type InitBody = {
   name?: string;
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (isNextControlFlowError(error)) throw error;
     console.error("[POST /api/upload/init]", error);
-    return fail("Could not prepare the upload.", 500);
+    const config = configurationErrorMessage(error);
+    return fail(config ?? "Could not prepare the upload.", config ? 503 : 500);
   }
 }

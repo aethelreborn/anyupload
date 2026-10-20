@@ -77,11 +77,7 @@ export function createR2Provider(): StorageProvider {
   return {
     name: "r2",
 
-    async createUploadUrl(
-      key: string,
-      contentType: string,
-      _origin?: string,
-    ): Promise<UploadUrl> {
+    async createUploadUrl(key: string, contentType: string): Promise<UploadUrl> {
       const { bucket } = buildR2Config();
       const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
       const url = await getSignedUrl(getClient(), command, {

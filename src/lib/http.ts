@@ -22,6 +22,17 @@ export function isNextControlFlowError(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_");
 }
 
+/**
+ * Configuration problems are safe to show to the user, and hiding them behind
+ * a generic "something went wrong" makes setup much harder.
+ */
+export function configurationErrorMessage(error: unknown): string | null {
+  if (error instanceof Error && error.name === "StorageConfigurationError") {
+    return error.message;
+  }
+  return null;
+}
+
 export function newId(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 24);
 }

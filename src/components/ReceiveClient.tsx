@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { downloadZip } from "client-zip";
 import {
   ArchiveIcon,
@@ -12,6 +12,16 @@ import {
 import { EmptyIcon, UploadCard, type UploadItem } from "@/components/UploadCard";
 
 const ADMIN_KEY_STORAGE = "anyupload.adminKey";
+
+type UploadsPayload = { uploads: UploadItem[]; storage: string };
+
+async function fetchUploads(): Promise<UploadsPayload> {
+  const response = await fetch("/api/uploads", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Could not load uploads (${response.status})`);
+  }
+  return (await response.json()) as UploadsPayload;
+}
 
 export function ReceiveClient() {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
@@ -25,35 +35,45 @@ export function ReceiveClient() {
   const [adminKey, setAdminKey] = useState("");
   const [showAdmin, setShowAdmin] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const hasLoadedRef = useRef(false);
+
+  const apply = useCallback((data: UploadsPayload) => {
+    setUploads(data.uploads);
+    setStorage(data.storage);
+    setError(null);
+    setSelected((prev) => {
+      const available = new Set(data.uploads.map((upload) => upload.id));
+      return new Set([...prev].filter((id) => available.has(id)));
+    });
+  }, []);
 
   const load = useCallback(async () => {
-    // Only the very first load shows the skeleton; later refreshes (on window
-    // focus) should not make the grid flash.
-    if (!hasLoadedRef.current) setLoading(true);
-    setError(null);
     try {
-      const response = await fetch("/api/uploads", { cache: "no-store" });
-      if (!response.ok) throw new Error(`Could not load uploads (${response.status})`);
-      const data = (await response.json()) as { uploads: UploadItem[]; storage: string };
-      setUploads(data.uploads);
-      setStorage(data.storage);
-      setSelected((prev) => {
-        const available = new Set(data.uploads.map((upload) => upload.id));
-        return new Set([...prev].filter((id) => available.has(id)));
-      });
+      apply(await fetchUploads());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load uploads.");
     } finally {
-      hasLoadedRef.current = true;
       setLoading(false);
     }
-  }, []);
+  }, [apply]);
 
   useEffect(() => {
-    void load();
-    setAdminKey(localStorage.getItem(ADMIN_KEY_STORAGE) ?? "");
-  }, [load]);
+    let cancelled = false;
+    fetchUploads()
+      .then((data) => {
+        if (!cancelled) apply(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load uploads.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
 
   // Pick up uploads made from another device without hammering the API.
   useEffect(() => {
@@ -301,7 +321,13 @@ export function ReceiveClient() {
         </p>
         <button
           type="button"
-          onClick={() => setShowAdmin((value) => !value)}
+          onClick={() => {
+            // Read the saved key from the click handler rather than an effect.
+            if (!showAdmin) {
+              setAdminKey(localStorage.getItem(ADMIN_KEY_STORAGE) ?? "");
+            }
+            setShowAdmin((value) => !value);
+          }}
           className="shrink-0 underline-offset-2 hover:text-foreground hover:underline"
         >
           {showAdmin ? "Hide admin key" : "Admin key"}

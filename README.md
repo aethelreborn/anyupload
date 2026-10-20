@@ -166,25 +166,33 @@ Environment Variables**.
 ## 5. Point darkie.dpdns.org at Vercel
 
 `darkie.dpdns.org` is delegated to Cloudflare's nameservers
-(`gemma.ns.cloudflare.com`), so the DNS record is added in the **Cloudflare
-dashboard**, not at dpdns.org.
+(`gemma.ns.cloudflare.com`), so the DNS records are added in the **Cloudflare
+dashboard** → Websites → `darkie.dpdns.org` → DNS → Add record.
 
-1. In Vercel: **Project → Settings → Domains → Add** → `darkie.dpdns.org`.
-   Vercel shows you the target, usually `cname.vercel-dns.com`.
-2. In Cloudflare: **Websites → darkie.dpdns.org → DNS → Add record**
-   - Type: **CNAME**
-   - Name: `darkie`
-   - Target: `cname.vercel-dns.com`
-   - Proxy status: **DNS only** (grey cloud) — proxied records do not work
-     with Vercel's domain verification.
-3. Wait for the certificate. Vercel provisions HTTPS automatically once DNS
-   resolves.
+The domain is already attached to the Vercel project. Two records are needed:
 
-If dpdns.org only offers A records, use the A record Vercel gives you instead
-and keep the CNAME as a fallback.
+| Type | Name | Value | Proxy |
+| --- | --- | --- | --- |
+| CNAME | `darkie` | `cname.vercel-dns.com` | **DNS only** (grey cloud) |
+| TXT | `_vercel` | `vc-domain-verify=darkie.dpdns.org,608c9bfae28017eebbcb` | n/a |
+
+The TXT record proves you own the domain. The CNAME is what actually routes
+traffic. Vercel issues the certificate automatically once both are in place;
+check the status at
+`vercel domains inspect darkie.dpdns.org` or in the Vercel dashboard.
+
+> Proxy status must be **DNS only**. A proxied (orange cloud) record does not
+> work with Vercel's domain verification.
 
 Until the CNAME exists the name does not resolve at all, so nothing works
-until step 2 is done.
+until it is added.
+
+### Deployment protection
+
+The project uses Vercel's default `all_except_custom_domains` protection: the
+`*.vercel.app` URL asks for a Vercel login, but **the custom domain is fully
+public**. If you would rather have the `.vercel.app` URL public too, set
+`ssoProtection` to `null` in the project settings.
 
 ---
 

@@ -112,7 +112,11 @@ JSON tab:
 ```json
 [
   {
-    "AllowedOrigins": ["https://darkie.dpdns.org", "http://localhost:3000"],
+    "AllowedOrigins": [
+      "https://darkie.dpdns.org",
+      "https://anyupload.vercel.app",
+      "http://localhost:3000"
+    ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
     "ExposeHeaders": ["ETag", "Content-Length", "Content-Type"],

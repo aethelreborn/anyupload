@@ -70,7 +70,11 @@ const corsRules = {
     {
       id: "anyupload-browser",
       allowed: {
-        origins: [siteOrigin, "http://localhost:3000"],
+        origins: [
+          siteOrigin,
+          "https://anyupload.vercel.app",
+          "http://localhost:3000",
+        ],
         methods: ["GET", "PUT", "HEAD"],
         headers: ["*"],
       },

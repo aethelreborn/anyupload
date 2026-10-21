@@ -4,12 +4,30 @@ export type StoredObject = {
   lastModified: Date;
 };
 
-export type UploadUrl = {
-  /** URL the browser sends the raw bytes to. */
-  url: string;
-  /** Headers the browser MUST send verbatim, or the signature will not match. */
-  headers: Record<string, string>;
-};
+/**
+ * How the browser should deliver the bytes to the backend.
+ *
+ * `presigned` is the simple case: one PUT of the whole file to a signed URL.
+ *
+ * `vercel-blob` hands the browser to the official Blob client instead. That
+ * client splits big files into parts and uploads them in parallel, so a
+ * 200 MB file no longer depends on one long-lived request staying alive.
+ */
+export type BrowserUpload =
+  | {
+      kind: "presigned";
+      /** URL the browser sends the raw bytes to. */
+      url: string;
+      /** Headers the browser MUST send verbatim, or the signature will not match. */
+      headers: Record<string, string>;
+    }
+  | {
+      kind: "vercel-blob";
+      /** Route on this app that mints the short lived client token. */
+      handleUploadUrl: string;
+      /** Whether the client should split the file into parts. */
+      multipart: boolean;
+    };
 
 export type DownloadUrlOptions = {
   /** When true the browser renders the file inline instead of downloading it. */
@@ -32,8 +50,8 @@ export type DownloadUrlOptions = {
  * its bytes land, even if the browser never reports back.
  *
  * Key layout:
- *   f/<id>/<percent-encoded-original-path>   the file itself
- *   n/<id>/<base64url-note>                   the note attached to it
+ *   f/<id>/<original-path>   the file itself
+ *   n/<id>/<base64url-note>   the note attached to it
  */
 export interface StorageProvider {
   readonly name: "r2" | "blob" | "local";
@@ -51,14 +69,17 @@ export interface StorageProvider {
   parseNoteKey(key: string): { id: string; note: string } | null;
 
   /**
-   * Signed URL the browser can PUT raw bytes to, bypassing the function body
-   * limit.
+   * Describes how the browser should put the bytes of a file into the store.
+   *
+   * The file never passes through the app server: the browser talks to the
+   * storage backend directly, which is what keeps the size limit out of the
+   * picture.
    */
-  createUploadUrl(
+  createBrowserUpload(
     key: string,
     contentType: string,
-    origin?: string,
-  ): Promise<UploadUrl>;
+    options: { size: number; origin?: string },
+  ): Promise<BrowserUpload>;
 
   /** Signed URL the browser can GET the file from. */
   createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string>;
@@ -85,6 +106,6 @@ export interface StorageProvider {
   /** Server-side delete. No-op when the key does not exist. */
   delete(key: string): Promise<void>;
 
-  /** Server-side list of every object in the store. */
-  list(): Promise<StoredObject[]>;
+  /** Server-side list of every object in the store, optionally filtered. */
+  list(prefix?: string): Promise<StoredObject[]>;
 }

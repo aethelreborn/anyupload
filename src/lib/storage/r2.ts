@@ -15,10 +15,10 @@ import {
 } from "./keys";
 import { isNotFound } from "./errors";
 import type {
+  BrowserUpload,
   DownloadUrlOptions,
   StorageProvider,
   StoredObject,
-  UploadUrl,
 } from "./types";
 
 const MAX_PRESIGN_SECONDS = 7 * 24 * 60 * 60; // S3/R2 hard ceiling is 7 days.
@@ -117,10 +117,10 @@ export function createR2Provider(): StorageProvider {
     buildNoteKey,
     parseNoteKey,
 
-    async createUploadUrl(
+    async createBrowserUpload(
       key: string,
       contentType: string,
-    ): Promise<UploadUrl> {
+    ): Promise<BrowserUpload> {
       const { bucket } = buildR2Config();
       const command = new PutObjectCommand({
         Bucket: bucket,
@@ -130,7 +130,7 @@ export function createR2Provider(): StorageProvider {
       const url = await getSignedUrl(getClient(), command, {
         expiresIn: clampExpiry(6 * 60 * 60),
       });
-      return { url, headers: { "Content-Type": contentType } };
+      return { kind: "presigned", url, headers: { "Content-Type": contentType } };
     },
 
     async createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string> {
@@ -191,7 +191,7 @@ export function createR2Provider(): StorageProvider {
       await getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
 
-    async list(): Promise<StoredObject[]> {
+    async list(prefix?: string): Promise<StoredObject[]> {
       const { bucket } = buildR2Config();
       const objects: StoredObject[] = [];
       let continuationToken: string | undefined;
@@ -200,6 +200,7 @@ export function createR2Provider(): StorageProvider {
         const result = await getClient().send(
           new ListObjectsV2Command({
             Bucket: bucket,
+            Prefix: prefix,
             ContinuationToken: continuationToken,
           }),
         );

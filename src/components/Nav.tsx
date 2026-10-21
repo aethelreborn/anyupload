@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
   { href: "/anyupload/send", label: "Send" },
@@ -11,13 +12,13 @@ const links = [
 
 export function Nav() {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-5 py-3.5">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-5 py-3">
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground no-underline"
+          className="focus-ring flex items-center gap-2 rounded-lg text-sm font-semibold tracking-tight text-foreground no-underline"
         >
-          <span className="flex size-7 items-center justify-center rounded-lg bg-accent text-accent-fg">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-accent text-accent-fg shadow-sm">
             <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
               <path
                 d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"
@@ -37,8 +38,11 @@ export function Nav() {
           <NavLinks />
         </Suspense>
 
-        <div className="ml-auto hidden text-xs text-muted sm:block">
-          send from one device · fetch from another
+        <div className="ml-auto flex items-center gap-1">
+          <span className="hidden text-xs text-muted md:block">
+            send from one device · fetch from another
+          </span>
+          <ThemeToggle />
         </div>
       </div>
     </header>
@@ -72,7 +76,7 @@ function NavLinks() {
             key={link.href}
             href={link.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${
+            className={`focus-ring rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${
               active
                 ? "bg-accent-soft text-accent"
                 : "text-muted hover:bg-surface-2 hover:text-foreground"

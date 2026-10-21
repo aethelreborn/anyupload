@@ -8,10 +8,10 @@ import {
   parseNoteKey,
 } from "./keys";
 import type {
+  BrowserUpload,
   DownloadUrlOptions,
   StorageProvider,
   StoredObject,
-  UploadUrl,
 } from "./types";
 
 /**
@@ -79,14 +79,18 @@ export function createLocalProvider(): StorageProvider {
     buildNoteKey,
     parseNoteKey,
 
-    async createUploadUrl(
+    async createBrowserUpload(
       key: string,
       contentType: string,
-      origin?: string,
-    ): Promise<UploadUrl> {
+      options: { size: number; origin?: string },
+    ): Promise<BrowserUpload> {
       const expires = Math.floor(Date.now() / 1000) + 6 * 60 * 60;
-      const url = `${baseUrl(origin)}/api/local/upload?key=${encodeURIComponent(key)}&exp=${expires}&sig=${sign(key, expires)}`;
-      return { url, headers: { "Content-Type": contentType } };
+      const url = `${baseUrl(options.origin)}/api/local/upload?key=${encodeURIComponent(key)}&exp=${expires}&sig=${sign(key, expires)}`;
+      return {
+        kind: "presigned",
+        url,
+        headers: { "Content-Type": contentType },
+      };
     },
 
     async createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string> {
@@ -133,7 +137,7 @@ export function createLocalProvider(): StorageProvider {
       await rm(resolveKey(key), { force: true });
     },
 
-    async list(): Promise<StoredObject[]> {
+    async list(prefix?: string): Promise<StoredObject[]> {
       const root = path.resolve(STORAGE_ROOT);
       const objects: StoredObject[] = [];
 
@@ -151,6 +155,7 @@ export function createLocalProvider(): StorageProvider {
             await walk(full);
           } else {
             const key = path.relative(root, full).split(path.sep).join("/");
+            if (prefix && !key.startsWith(prefix)) continue;
             objects.push({ key, size: info.size, lastModified: info.mtime });
           }
         }

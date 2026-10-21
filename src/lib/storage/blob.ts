@@ -3,11 +3,8 @@ import {
   del,
   get,
   head,
-  issueSignedToken,
   list,
-  presignUrl,
   put,
-  type IssuedSignedToken,
 } from "@vercel/blob";
 import {
   buildKey,
@@ -16,10 +13,10 @@ import {
   parseNoteKey,
 } from "./keys";
 import type {
+  BrowserUpload,
   DownloadUrlOptions,
   StorageProvider,
   StoredObject,
-  UploadUrl,
 } from "./types";
 
 /**
@@ -28,23 +25,32 @@ import type {
  * Needs no payment method: the Hobby plan includes 1 GB of storage, 10k
  * simple operations, 2k advanced operations and 10 GB of transfer per month.
  *
- * Uploads use a presigned PUT URL, which keeps the bytes off the serverless
- * function exactly like the R2 backend does. The URL is produced by
- * `presignUrl`, which is a local HMAC operation; only the delegation token
- * needs a network round-trip, and that one is cached.
+ * Uploads go through the official Blob browser client, which is handed a
+ * short-lived client token by `/api/upload/blob-token`. The bytes never touch
+ * the app server, and anything above the multipart threshold is split into
+ * parts that travel in parallel, so the transfer survives a slow link.
  */
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB, the single-part limit
-const TOKEN_LIFETIME_MS = 60 * 60 * 1000; // 1 hour
-const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000;
+/** Hard ceiling of a single upload. Vercel Blob itself allows up to 5 TB. */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 
-let cachedBase: string | null = null;
-let cachedToken: { token: IssuedSignedToken; expiresAt: number } | null = null;
+/**
+ * Files above this size are uploaded as parts. A single request has to stay
+ * alive for the whole transfer, so the slower the link the more likely it is
+ * to be cut off halfway; parts are small, retried on their own and sent in
+ * parallel.
+ */
+export const MULTIPART_THRESHOLD_BYTES = 16 * 1024 * 1024;
+
+/** Route that mints the client token the browser uploads with. */
+export const CLIENT_TOKEN_ROUTE = "/api/upload/blob-token";
 
 /** Percent-encodes each path segment so the pathname is a valid URL path. */
 function encodePathname(pathname: string): string {
   return pathname.split("/").map(encodeURIComponent).join("/");
 }
+
+let cachedBase: string | null = null;
 
 function storeBaseUrl(): string {
   if (cachedBase) return cachedBase;
@@ -58,33 +64,12 @@ function storeBaseUrl(): string {
   const storeId = process.env.BLOB_STORE_ID?.replace(/^store_/, "").toLowerCase();
   if (!storeId) {
     throw new Error(
-      "BLOB_STORE_ID is not set. Connect the Blob store to the project (Vercel -> Storage -> yourupload -> Projects -> Connect to Project) or set BLOB_PUBLIC_BASE_URL.",
+      "BLOB_STORE_ID is not set. Connect the Blob store to the project (Vercel -> Storage -> anyupload -> Projects -> Connect to Project) or set BLOB_PUBLIC_BASE_URL.",
     );
   }
 
   cachedBase = `https://${storeId}.public.blob.vercel-storage.com`;
   return cachedBase;
-}
-
-/**
- * The delegation token is the only part of the presigned flow that needs a
- * network call, so it is cached until shortly before it expires.
- */
-async function getPutToken(): Promise<IssuedSignedToken> {
-  if (cachedToken && cachedToken.expiresAt - TOKEN_REFRESH_MARGIN_MS > Date.now()) {
-    return cachedToken.token;
-  }
-
-  const token = await issueSignedToken({
-    // A store wide wildcard so one token covers every upload.
-    pathname: "*",
-    operations: ["put"],
-    maximumSizeInBytes: MAX_UPLOAD_BYTES,
-    validUntil: Date.now() + TOKEN_LIFETIME_MS,
-  });
-
-  cachedToken = { token, expiresAt: token.validUntil };
-  return token;
 }
 
 export function createBlobProvider(): StorageProvider {
@@ -96,22 +81,16 @@ export function createBlobProvider(): StorageProvider {
     buildNoteKey,
     parseNoteKey,
 
-    async createUploadUrl(
+    async createBrowserUpload(
       key: string,
       _contentType: string,
-    ): Promise<UploadUrl> {
-      const token = await getPutToken();
-      const { presignedUrl } = await presignUrl(token, {
-        operation: "put",
-        pathname: key,
-        access: "public",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        maximumSizeInBytes: MAX_UPLOAD_BYTES,
-      });
-      // Vercel Blob derives the stored content type from the pathname
-      // extension, so the client does not need to send one.
-      return { url: presignedUrl, headers: {} };
+      options: { size: number },
+    ): Promise<BrowserUpload> {
+      return {
+        kind: "vercel-blob",
+        handleUploadUrl: CLIENT_TOKEN_ROUTE,
+        multipart: options.size >= MULTIPART_THRESHOLD_BYTES,
+      };
     },
 
     async createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string> {
@@ -121,19 +100,13 @@ export function createBlobProvider(): StorageProvider {
       return options?.inline ? url : `${url}?download=1`;
     },
 
-    async downloadResponse(key: string, filename: string): Promise<Response> {
-      const result = await get(key, { access: "public" });
-      if (!result) {
-        return new Response("Not found", { status: 404 });
-      }
-
-      return new Response(result.stream, {
-        headers: {
-          "Content-Type": result.blob.contentType ?? "application/octet-stream",
-          "Content-Disposition": contentDisposition(filename),
-          "Cache-Control": "private, no-store",
-        },
-      });
+    async downloadResponse(key: string, _filename: string): Promise<Response> {
+      // Redirect instead of streaming. The bytes come straight off the Blob
+      // CDN, which keeps multi hundred megabyte downloads off the function
+      // and makes them resumable.
+      const base = storeBaseUrl();
+      const url = `${base}/${encodePathname(key)}?download=1`;
+      return Response.redirect(url, 302);
     },
 
     async put(key, body, contentType) {
@@ -165,12 +138,12 @@ export function createBlobProvider(): StorageProvider {
       await del(key);
     },
 
-    async list(): Promise<StoredObject[]> {
+    async list(prefix?: string): Promise<StoredObject[]> {
       const objects: StoredObject[] = [];
       let cursor: string | undefined;
 
       do {
-        const result = await list({ cursor, limit: 1000 });
+        const result = await list({ cursor, limit: 1000, prefix });
         for (const blob of result.blobs) {
           objects.push({
             key: blob.pathname,
@@ -184,19 +157,4 @@ export function createBlobProvider(): StorageProvider {
       return objects;
     },
   };
-}
-
-/**
- * Builds a Content-Disposition value that survives non-ASCII filenames.
- * `filename=` is a sanitised ASCII fallback, `filename*=` carries the real
- * UTF-8 name.
- */
-export function contentDisposition(filename: string): string {
-  const ascii =
-    filename
-      .replace(/[^\x20-\x7E]/g, "_")
-      .replace(/["\\]/g, "_")
-      .trim() || "download";
-  const encoded = encodeURIComponent(filename);
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }

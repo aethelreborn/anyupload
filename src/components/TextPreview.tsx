@@ -28,7 +28,7 @@ export function TextPreview({ url, name }: { url: string; name: string }) {
   }, [url]);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-surface-2 p-3 text-left">
+    <div className="h-full w-full overflow-hidden bg-surface-2 px-3 pb-3 pt-9 text-left">
       {failed ? (
         <p className="text-xs text-muted">Preview unavailable.</p>
       ) : text === null ? (

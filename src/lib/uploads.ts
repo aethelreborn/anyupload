@@ -1,5 +1,5 @@
 import { getStorage } from "./storage";
-import { MAX_NOTE_LENGTH } from "./storage/keys";
+import { FILE_PREFIX, MAX_NOTE_LENGTH, NOTE_PREFIX } from "./storage/keys";
 import { guessMime } from "./mime";
 
 export { guessMime };
@@ -82,9 +82,46 @@ export async function listUploads(): Promise<UploadRecord[]> {
   return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/**
+ * Looks one upload up without walking the whole bucket.
+ *
+ * Both objects of an upload share the same id, so two prefix listings are
+ * enough. Resolving a share link therefore costs two small requests instead
+ * of a full scan, which matters once the bucket holds a lot of files.
+ */
 export async function getUpload(id: string): Promise<UploadRecord | null> {
-  const records = await listUploads();
-  return records.find((record) => record.id === id) ?? null;
+  if (!/^[a-z0-9]{8,64}$/i.test(id)) return null;
+
+  const storage = getStorage();
+  const [files, notes] = await Promise.all([
+    storage.list(`${FILE_PREFIX}${id}/`),
+    storage.list(`${NOTE_PREFIX}${id}/`),
+  ]);
+
+  const object = files[0];
+  if (!object) return null;
+
+  const file = storage.parseKey(object.key);
+  if (!file) return null;
+
+  const note = notes
+    .map((entry) => storage.parseNoteKey(entry.key))
+    .find((entry): entry is { id: string; note: string } => Boolean(entry));
+
+  const mime = guessMime(file.path);
+
+  return {
+    id: file.id,
+    name: basename(file.path),
+    path: file.path,
+    size: object.size,
+    mime,
+    kind: mime.startsWith("text/") ? "text" : "file",
+    note: note?.note ?? "",
+    folder: rootFolder(file.path),
+    createdAt: object.lastModified.toISOString(),
+    key: object.key,
+  };
 }
 
 /**

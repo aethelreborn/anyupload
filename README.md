@@ -25,13 +25,15 @@ Instead the files live in **Vercel Blob**, and the browser uploads them
 **straight to the bucket**:
 
 ```
-browser ──(1) POST /api/upload/init────▶ app server ──▶ mints a presigned PUT URL
-browser ──(2) PUT  <presigned url>──────▶ Vercel Blob    ← the bytes never touch the app
-browser ──(3) POST /api/upload/complete▶ app server ──▶ stores the note
+browser ──(1) POST /api/upload/init────▶ app server ──▶ mints the id and the key
+browser ──(2) POST /api/upload/blob-token▶ app server ──▶ mints a client token
+browser ──(3) PUT  <signed url>────────▶ Vercel Blob    ← the bytes never touch the app
+browser ──(4) POST /api/upload/complete▶ app server ──▶ stores the note
 ```
 
 Because the file never passes through a serverless function, **there is no
-size limit in practice** (single-part uploads up to 5 GB, multipart beyond).
+size limit in practice**. Anything above 16 MiB is uploaded in parts, so a slow
+link cannot cut a big transfer in half.
 
 ### There is no index
 
@@ -56,6 +58,9 @@ That has three useful consequences:
 The size, upload date and content type all come out of the listing as well, so
 the only thing that needs a second object is the free-form note.
 
+Resolving a single share link uses a **prefix listing** (`f/<id>/`), so it
+costs two small requests instead of a full scan of the bucket.
+
 ### Why Vercel Blob and not R2
 
 Both work. Vercel Blob is the default because **it needs no payment method**,
@@ -64,7 +69,7 @@ and R2 needs a card on file even though its free tier exists.
 | | Vercel Blob | Cloudflare R2 | Git |
 | --- | --- | --- | --- |
 | Free storage | 1 GB/mo | 10 GB/mo | 1 GB soft limit |
-| Max file size | 5 TB (5 GB single part) | 5 TiB | 100 MB |
+| Max file size | 5 TB | 5 TiB | 100 MB |
 | Egress | 10 GB free, then $0.05/GB | **free forever** | n/a |
 | Payment method needed | **no** | yes | no |
 | Setup | one CLI command | bucket + API token | none |
@@ -162,26 +167,31 @@ public**. If you would rather have the `.vercel.app` URL public too, set
 ### Upload
 
 1. `POST /api/upload/init` with `{ name, path, size, mime, kind, note }`. The
-   server mints an id, builds the key `f/<id>/<original path>` and returns a
-   presigned PUT URL.
-2. The browser `PUT`s the raw bytes to that URL with `XMLHttpRequest` (the only
-   browser API that reports upload progress).
-3. `POST /api/upload/complete` confirms the bytes landed and stores the note as
+   server mints an id, builds the key `f/<id>/<original path>` and answers
+   with the plan for the bytes: a presigned URL, or the Blob client.
+2. The browser asks `POST /api/upload/blob-token` for a client token. The
+   token is scoped to **exactly one object key**, so the write permission is
+   as narrow as it can be.
+3. The browser puts the bytes into the bucket. Small files go in one request,
+   bigger ones are split into 8 MiB parts that travel in parallel and are
+   retried individually.
+4. `POST /api/upload/complete` confirms the bytes landed and stores the note as
    a second object keyed by the same id.
 
-Three files at a time are uploaded in parallel.
+Three files at a time are uploaded in parallel. A failed transfer is retried
+twice with a short backoff, and the browser can cancel a running upload.
 
 ### Download
 
-- **Per file:** `/anyupload/file/<id>` serves the upload under its original
-  filename. The link never expires.
-- **Grid cards:** `/api/uploads` returns a signed download URL and a signed
-  inline preview URL per upload. Presigning is pure local HMAC computation, so
-  listing 1000 uploads costs no extra network calls.
-- **ZIP:** `POST /api/download` returns signed URLs for a set of ids; the
-  browser streams them into a ZIP with [`client-zip`](https://github.com/Touffy/client-zip)
-  without the files ever touching the server. The files are fetched lazily,
-  one at a time, so a hundred files do not mean a hundred open connections.
+- **Per file:** `/anyupload/file/<id>` resolves the upload and **redirects to
+  the CDN**, so the bytes never travel through the app server. The link never
+  expires and range requests work, so big downloads are resumable.
+- **Grid cards:** `/api/uploads` returns the CDN url for each upload.
+- **ZIP:** `POST /api/download` returns the urls for a set of ids; the browser
+  streams them into a ZIP with [`client-zip`](https://github.com/Touffy/client-zip)
+  without the files ever touching the server. Where the browser supports the
+  File System Access API the archive is written straight to disk, otherwise it
+  is buffered in memory first.
 
 ### Folders
 
@@ -201,14 +211,34 @@ extensionless files, the type is stored as-is, and the name is preserved.
 prompts for the key once and keeps it in `localStorage`. With no `ADMIN_KEY`
 set, deletion is disabled entirely.
 
+### Retrying without duplicates
+
+The id of an upload is what the object key is built from, so it doubles as the
+write permission for that object. `/api/upload/init` hands out a signed
+session with the id, and only the browser that asked for it may reuse that id
+on a retry. A retry therefore overwrites its own object and nobody else's.
+
+## Limits
+
+| | |
+| --- | --- |
+| Single request upload | up to 5 GB |
+| Multipart upload | up to ~80 GB (10 000 parts × 8 MiB) |
+| Note length | 400 characters |
+| Object key length | 950 characters (the Blob limit) |
+
+Anything above the multipart threshold is uploaded in parts, so the practical
+ceiling is the number of parts, not the size of a request.
+
 ## API
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/uploads` | list uploads with signed URLs |
-| `POST` | `/api/upload/init` | presigned PUT URL for a new upload |
+| `GET` | `/api/uploads` | list uploads with their CDN urls |
+| `POST` | `/api/upload/init` | mint the id, the key and the upload plan |
+| `POST` | `/api/upload/blob-token` | mint a client token for one object key |
 | `POST` | `/api/upload/complete` | store the note for a finished upload |
-| `POST` | `/api/download` | presigned GET URLs for a set of ids (ZIP) |
+| `POST` | `/api/download` | CDN urls for a set of ids (ZIP) |
 | `DELETE` | `/api/uploads/:id` | delete an upload (needs `x-admin-key`) |
 | `GET` | `/anyupload/file/:id` | permanent share link |
 
@@ -217,10 +247,12 @@ set, deletion is disabled entirely.
 ```bash
 npm run smoke                                        # against localhost:3000
 BASE_URL=https://darkie.dpdns.org ADMIN_KEY=xxx npm run smoke
+SMOKE_LARGE_MB=64 npm run smoke                      # also push a file in parts
 ```
 
 It exercises the whole flow: upload, list, download through the share link and
-delete, and fails loudly if any step breaks.
+delete, and fails loudly if any step breaks. `SMOKE_LARGE_MB` adds a file big
+enough to be split into parts, which is the path that used to fall over.
 
 ## Troubleshooting
 
@@ -233,10 +265,14 @@ read-only there) and says so instead of failing with a confusing error. Set
 **Upload works locally but not on Vercel**
 `NEXT_PUBLIC_SITE_URL` must be set in production.
 
+**The upload fails with a CORS error**
+The browser talks to `vercel.com/api/blob`, so the bucket has to allow the
+origin. Run `vercel blob store` and check the CORS policy of the store.
+
 **`darkie.dpdns.org` won't load**
 The certificate has not been issued yet. That takes a few minutes after the
 DNS records land. `vercel domains inspect darkie.dpdns.org` shows the status.
 
 **A file downloads with a weird name**
-The share link always serves the original name. If you use the raw bucket URL
-instead, Vercel Blob derives the name from the object path.
+The share link redirects to the CDN, which takes the name from the object
+path. The original name is the last segment of that path, so it is preserved.

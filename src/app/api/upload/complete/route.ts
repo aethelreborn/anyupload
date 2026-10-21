@@ -1,6 +1,13 @@
 import { getStorage } from "@/lib/storage";
 import { saveNote } from "@/lib/uploads";
-import { fail, configurationErrorMessage, isNextControlFlowError, json, readJson } from "@/lib/http";
+import { verifyUploadSession } from "@/lib/secret";
+import {
+  fail,
+  configurationErrorMessage,
+  isNextControlFlowError,
+  json,
+  readJson,
+} from "@/lib/http";
 
 type CompleteRecord = {
   id?: string;
@@ -12,6 +19,8 @@ type CompleteRecord = {
   kind?: "file" | "text";
   note?: string;
   folder?: string | null;
+  /** Proof that this browser is the one the id was handed out to. */
+  session?: string;
 };
 
 type CompleteBody = { records?: CompleteRecord[] } & CompleteRecord;
@@ -38,6 +47,10 @@ export async function POST(request: Request) {
 
   for (const item of incoming) {
     if (!item?.id || !item?.key) continue;
+
+    // The id decides which object is written, so it is only honoured for the
+    // browser that asked for it in the first place.
+    if (!verifyUploadSession(item.id, item.session ?? "")) continue;
 
     const head = await storage.head(item.key);
     if (!head) {

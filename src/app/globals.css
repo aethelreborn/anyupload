@@ -1,33 +1,78 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens
+   Light is the default, dark follows the system unless the user picks one.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #f5f6f8;
-  --foreground: #0b0d11;
+  --background: #f6f7f9;
+  --foreground: #0c0e12;
   --surface: #ffffff;
-  --surface-2: #eef0f4;
+  --surface-2: #eef1f5;
+  --surface-3: #e4e8ee;
   --border: #dfe3ea;
+  --border-strong: #c9cfd9;
   --muted: #667085;
   --accent: #4f46e5;
+  --accent-hover: #4338ca;
   --accent-soft: #eceafe;
   --accent-fg: #ffffff;
   --danger: #dc2626;
+  --danger-soft: #fee2e2;
   --success: #059669;
+  --success-soft: #d1fae5;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+  --ring: #4f46e5;
+  --shadow-color: 220 40% 20%;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #0a0b0e;
     --foreground: #e9ebef;
-    --surface: #141619;
-    --surface-2: #1c1f24;
-    --border: #282c33;
+    --surface: #121418;
+    --surface-2: #1a1d23;
+    --surface-3: #23272e;
+    --border: #262a32;
+    --border-strong: #363b45;
     --muted: #98a1ae;
-    --accent: #6d6df0;
-    --accent-soft: #1e1f3a;
+    --accent: #7b7bf7;
+    --accent-hover: #8e8ef9;
+    --accent-soft: #1e2036;
     --accent-fg: #ffffff;
     --danger: #f87171;
+    --danger-soft: #2a1618;
     --success: #34d399;
+    --success-soft: #10241c;
+    --warning: #fbbf24;
+    --warning-soft: #2a2113;
+    --ring: #7b7bf7;
+    --shadow-color: 220 60% 2%;
   }
+}
+
+:root[data-theme="dark"] {
+  --background: #0a0b0e;
+  --foreground: #e9ebef;
+  --surface: #121418;
+  --surface-2: #1a1d23;
+  --surface-3: #23272e;
+  --border: #262a32;
+  --border-strong: #363b45;
+  --muted: #98a1ae;
+  --accent: #7b7bf7;
+  --accent-hover: #8e8ef9;
+  --accent-soft: #1e2036;
+  --accent-fg: #ffffff;
+  --danger: #f87171;
+  --danger-soft: #2a1618;
+  --success: #34d399;
+  --success-soft: #10241c;
+  --warning: #fbbf24;
+  --warning-soft: #2a2113;
+  --ring: #7b7bf7;
+  --shadow-color: 220 60% 2%;
 }
 
 @theme inline {
@@ -35,29 +80,48 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
+  color-scheme: light;
+}
+
+html:not([data-theme="light"]) {
   color-scheme: light dark;
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
+  /* Longhand on purpose: a `background` shorthand that contains a custom
+     property does not always pick up the new value when the theme changes. */
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: var(--accent);
+  background-color: var(--accent);
   color: var(--accent-fg);
 }
 
@@ -69,32 +133,166 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 30rem at 15% -10%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
-    radial-gradient(50rem 25rem at 90% 0%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 70%);
+    radial-gradient(60rem 30rem at 12% -12%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 70%),
+    radial-gradient(48rem 26rem at 92% -4%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%);
 }
 
-@layer utilities {
+/* ---------------------------------------------------------------------------
+   Components
+--------------------------------------------------------------------------- */
+@layer components {
   .panel {
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: 1rem;
   }
 
+  .panel-raised {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    box-shadow:
+      0 1px 2px 0 hsl(var(--shadow-color) / 0.05),
+      0 8px 24px -18px hsl(var(--shadow-color) / 0.35);
+  }
+
   .card-hover {
-    transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    transition:
+      border-color 150ms ease,
+      transform 150ms ease,
+      box-shadow 150ms ease;
   }
 
   .card-hover:hover {
-    border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px -18px color-mix(in oklab, var(--accent) 60%, transparent);
+    box-shadow: 0 14px 34px -20px color-mix(in oklab, var(--accent) 60%, transparent);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.625rem;
+    border: 1px solid transparent;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      opacity 140ms ease;
+  }
+
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .btn-primary {
+    background-color: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background-color: var(--surface);
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--surface-2);
+  }
+
+  .btn-ghost {
+    color: var(--muted);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--surface-2);
+    color: var(--foreground);
+  }
+
+  .btn-danger {
+    background-color: var(--surface);
+    border-color: var(--border);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background-color: var(--danger-soft);
+    border-color: color-mix(in oklab, var(--danger) 35%, var(--border));
+  }
+
+  .input {
+    width: 100%;
+    border-radius: 0.625rem;
+    border: 1px solid var(--border);
+    background-color: var(--surface);
+    color: var(--foreground);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .input::placeholder {
+    color: var(--muted);
+  }
+
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background-color: var(--surface-2);
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1rem;
+    color: var(--muted);
+  }
+
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
   }
 }
 
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion
+--------------------------------------------------------------------------- */
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -103,7 +301,7 @@ body::before {
 }
 
 .animate-fade-up {
-  animation: fade-up 240ms ease both;
+  animation: fade-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes shimmer {
@@ -120,10 +318,48 @@ body::before {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in oklab, var(--foreground) 8%, transparent),
+    color-mix(in oklab, var(--foreground) 7%, transparent),
     transparent
   );
   animation: shimmer 1.4s infinite;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Thin, unobtrusive scrollbars. */

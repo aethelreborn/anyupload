@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { verifyLocalSignature } from "@/lib/storage/local";
+import { guessMime } from "@/lib/mime";
 import { fail, isNextControlFlowError } from "@/lib/http";
 
 const STORAGE_ROOT = path.join(process.cwd(), ".storage");
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     const stream = Readable.toWeb(createReadStream(resolved)) as ReadableStream;
     return new Response(stream, {
       headers: {
-        "Content-Type": "application/octet-stream",
+        "Content-Type": guessMime(name),
         "Content-Length": String(info.size),
         "Content-Disposition": `${disposition}; filename="${name.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_")}"`,
         "Cache-Control": "private, max-age=0, no-store",

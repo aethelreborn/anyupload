@@ -1,5 +1,5 @@
 import { getStorage } from "@/lib/storage";
-import { buildKey, guessMime } from "@/lib/uploads";
+import { guessMime } from "@/lib/uploads";
 import { fail, configurationErrorMessage, isNextControlFlowError, json, newId, readJson } from "@/lib/http";
 
 type InitBody = {
@@ -32,10 +32,10 @@ export async function POST(request: Request) {
   const mime = (body.mime ?? "").toString() || guessMime(path);
   const reuseId = (body.reuseId ?? "").toString();
   const id = /^[a-z0-9]{8,64}$/i.test(reuseId) ? reuseId : newId();
-  const key = buildKey(id, path);
 
   try {
     const storage = getStorage();
+    const key = storage.buildKey(id, path);
     const upload = await storage.createUploadUrl(
       key,
       mime,

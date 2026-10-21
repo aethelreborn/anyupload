@@ -1,6 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  buildKey,
+  buildNoteKey,
+  parseKey,
+  parseNoteKey,
+} from "./keys";
 import type {
   DownloadUrlOptions,
   StorageProvider,
@@ -9,9 +15,9 @@ import type {
 } from "./types";
 
 /**
- * Filesystem-backed provider used for local development when no R2 credentials
- * are configured. It mirrors the R2 provider's contract (signed browser-facing
- * URLs) so the client code path is identical in both modes.
+ * Filesystem-backed provider used for local development when no cloud storage
+ * is configured. It mirrors the cloud providers' contract (signed
+ * browser-facing URLs) so the client code path is identical in every mode.
  */
 
 const STORAGE_ROOT = path.join(process.cwd(), ".storage");
@@ -53,9 +59,25 @@ function baseUrl(origin?: string): string {
   return process.env.LOCAL_SITE_URL || "http://localhost:3000";
 }
 
+async function localDownloadUrl(
+  key: string,
+  options?: DownloadUrlOptions,
+): Promise<string> {
+  const expires =
+    Math.floor(Date.now() / 1000) + (options?.expiresIn ?? MAX_SIGNATURE_SECONDS);
+  const name = options?.filename ?? key.split("/").pop() ?? "download";
+  const disposition = options?.inline ? "inline" : "attachment";
+  return `${baseUrl(options?.origin)}/api/local/download?key=${encodeURIComponent(key)}&exp=${expires}&sig=${sign(key, expires)}&name=${encodeURIComponent(name)}&disposition=${disposition}`;
+}
+
 export function createLocalProvider(): StorageProvider {
   return {
     name: "local",
+
+    buildKey,
+    parseKey,
+    buildNoteKey,
+    parseNoteKey,
 
     async createUploadUrl(
       key: string,
@@ -68,49 +90,50 @@ export function createLocalProvider(): StorageProvider {
     },
 
     async createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string> {
-      const expires = Math.floor(Date.now() / 1000) + (options?.expiresIn ?? MAX_SIGNATURE_SECONDS);
-      const name = options?.filename ?? key.split("/").pop() ?? "download";
-      const disposition = options?.inline ? "inline" : "attachment";
-      return `${baseUrl(options?.origin)}/api/local/download?key=${encodeURIComponent(key)}&exp=${expires}&sig=${sign(key, expires)}&name=${encodeURIComponent(name)}&disposition=${disposition}`;
+      return localDownloadUrl(key, options);
     },
 
-    async put(key, body, _contentType, options) {
+    async downloadResponse(
+      key: string,
+      filename: string,
+      origin?: string,
+    ): Promise<Response> {
+      const url = await localDownloadUrl(key, {
+        inline: false,
+        filename,
+        origin,
+      });
+      return Response.redirect(url, 302);
+    },
+
+    async put(key, body) {
       const filePath = resolveKey(key);
-      if (options?.ifMatch) {
-        const existing = await readLocalObject(key);
-        if (!existing || existing.etag !== options.ifMatch) {
-          const error = new Error("Precondition failed") as Error & {
-            $metadata?: { httpStatusCode: number };
-          };
-          error.$metadata = { httpStatusCode: 412 };
-          throw error;
-        }
-      }
       await mkdir(path.dirname(filePath), { recursive: true });
-      await writeFile(filePath, body);
-      return { etag: await etagOf(filePath) };
+      await writeFile(filePath, body, "utf8");
     },
 
     async get(key) {
-      return readLocalObject(key);
+      try {
+        return await readFile(resolveKey(key), "utf8");
+      } catch {
+        return null;
+      }
     },
 
     async head(key) {
-      const filePath = resolveKey(key);
       try {
-        const info = await stat(filePath);
-        return { size: info.size, etag: await etagOf(filePath), lastModified: info.mtime };
+        const info = await stat(resolveKey(key));
+        return { size: info.size, lastModified: info.mtime };
       } catch {
         return null;
       }
     },
 
     async delete(key) {
-      const filePath = resolveKey(key);
-      await rm(filePath, { force: true });
+      await rm(resolveKey(key), { force: true });
     },
 
-    async list(prefix: string): Promise<StoredObject[]> {
+    async list(): Promise<StoredObject[]> {
       const root = path.resolve(STORAGE_ROOT);
       const objects: StoredObject[] = [];
 
@@ -133,25 +156,8 @@ export function createLocalProvider(): StorageProvider {
         }
       }
 
-      await walk(resolveKey(prefix === "" ? "" : prefix.split("/")[0] || ""));
-      return objects.filter((object) => object.key.startsWith(prefix));
+      await walk(root);
+      return objects;
     },
   };
-}
-
-async function etagOf(filePath: string): Promise<string> {
-  const content = await readFile(filePath);
-  return `"${createHmac("sha256", "local").update(content).digest("hex")}"`;
-}
-
-async function readLocalObject(
-  key: string,
-): Promise<{ body: string; etag?: string } | null> {
-  const filePath = resolveKey(key);
-  try {
-    const body = await readFile(filePath, "utf8");
-    return { body, etag: await etagOf(filePath) };
-  } catch {
-    return null;
-  }
 }

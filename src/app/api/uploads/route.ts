@@ -17,7 +17,6 @@ export async function GET(request: Request) {
         mime: record.mime,
         kind: record.kind,
         note: record.note,
-        batchId: record.batchId,
         folder: record.folder,
         createdAt: record.createdAt,
         // The stable, shareable link. It always resolves to a fresh signed URL.

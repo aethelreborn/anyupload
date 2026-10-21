@@ -7,6 +7,13 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import {
+  buildKey,
+  buildNoteKey,
+  parseKey,
+  parseNoteKey,
+} from "./keys";
+import { isNotFound } from "./errors";
 import type {
   DownloadUrlOptions,
   StorageProvider,
@@ -22,7 +29,12 @@ export function buildR2Config() {
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
   const bucket = process.env.R2_BUCKET_NAME;
 
-  const missing = Object.entries({ R2_ACCOUNT_ID: accountId, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET_NAME: bucket })
+  const missing = Object.entries({
+    R2_ACCOUNT_ID: accountId,
+    R2_ACCESS_KEY_ID: accessKeyId,
+    R2_SECRET_ACCESS_KEY: secretAccessKey,
+    R2_BUCKET_NAME: bucket,
+  })
     .filter(([, v]) => !v)
     .map(([k]) => k);
 
@@ -32,7 +44,12 @@ export function buildR2Config() {
     );
   }
 
-  return { accountId: accountId!, accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey!, bucket: bucket! };
+  return {
+    accountId: accountId!,
+    accessKeyId: accessKeyId!,
+    secretAccessKey: secretAccessKey!,
+    bucket: bucket!,
+  };
 }
 
 let client: S3Client | null = null;
@@ -73,13 +90,43 @@ export function contentDisposition(filename: string, inline: boolean): string {
   return `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
+async function r2DownloadUrl(
+  key: string,
+  options?: DownloadUrlOptions,
+): Promise<string> {
+  const { bucket } = buildR2Config();
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: contentDisposition(
+      options?.filename ?? key.split("/").pop() ?? "download",
+      options?.inline ?? false,
+    ),
+  });
+  return getSignedUrl(getClient(), command, {
+    expiresIn: clampExpiry(options?.expiresIn),
+  });
+}
+
 export function createR2Provider(): StorageProvider {
   return {
     name: "r2",
 
-    async createUploadUrl(key: string, contentType: string): Promise<UploadUrl> {
+    buildKey,
+    parseKey,
+    buildNoteKey,
+    parseNoteKey,
+
+    async createUploadUrl(
+      key: string,
+      contentType: string,
+    ): Promise<UploadUrl> {
       const { bucket } = buildR2Config();
-      const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: contentType,
+      });
       const url = await getSignedUrl(getClient(), command, {
         expiresIn: clampExpiry(6 * 60 * 60),
       });
@@ -87,40 +134,36 @@ export function createR2Provider(): StorageProvider {
     },
 
     async createDownloadUrl(key: string, options?: DownloadUrlOptions): Promise<string> {
-      const { bucket } = buildR2Config();
-      const command = new GetObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        ResponseContentDisposition: contentDisposition(
-          options?.filename ?? key.split("/").pop() ?? "download",
-          options?.inline ?? false,
-        ),
-      });
-      return getSignedUrl(getClient(), command, { expiresIn: clampExpiry(options?.expiresIn) });
+      return r2DownloadUrl(key, options);
     },
 
-    async put(key, body, contentType, options) {
+    async downloadResponse(
+      key: string,
+      filename: string,
+    ): Promise<Response> {
+      const url = await r2DownloadUrl(key, { inline: false, filename });
+      return Response.redirect(url, 302);
+    },
+
+    async put(key, body, contentType) {
       const { bucket } = buildR2Config();
-      const result = await getClient().send(
+      await getClient().send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: key,
           Body: body,
           ContentType: contentType,
-          ...(options?.ifMatch ? { IfMatch: options.ifMatch } : {}),
-          ...(options?.ifNoneMatch ? { IfNoneMatch: options.ifNoneMatch } : {}),
         }),
       );
-      return { etag: result.ETag };
     },
 
     async get(key) {
       const { bucket } = buildR2Config();
       try {
-        const result = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-        const body = await result.Body?.transformToString();
-        if (body === undefined) return null;
-        return { body, etag: result.ETag };
+        const result = await getClient().send(
+          new GetObjectCommand({ Bucket: bucket, Key: key }),
+        );
+        return (await result.Body?.transformToString()) ?? null;
       } catch (error) {
         if (isNotFound(error)) return null;
         throw error;
@@ -130,10 +173,11 @@ export function createR2Provider(): StorageProvider {
     async head(key) {
       const { bucket } = buildR2Config();
       try {
-        const result = await getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        const result = await getClient().send(
+          new HeadObjectCommand({ Bucket: bucket, Key: key }),
+        );
         return {
           size: result.ContentLength ?? 0,
-          etag: result.ETag,
           lastModified: result.LastModified ?? new Date(0),
         };
       } catch (error) {
@@ -147,7 +191,7 @@ export function createR2Provider(): StorageProvider {
       await getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
 
-    async list(prefix: string): Promise<StoredObject[]> {
+    async list(): Promise<StoredObject[]> {
       const { bucket } = buildR2Config();
       const objects: StoredObject[] = [];
       let continuationToken: string | undefined;
@@ -156,7 +200,6 @@ export function createR2Provider(): StorageProvider {
         const result = await getClient().send(
           new ListObjectsV2Command({
             Bucket: bucket,
-            Prefix: prefix,
             ContinuationToken: continuationToken,
           }),
         );
@@ -176,14 +219,4 @@ export function createR2Provider(): StorageProvider {
   };
 }
 
-export function isNotFound(error: unknown): boolean {
-  const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
-  const name = (error as { name?: string })?.name;
-  return status === 404 || name === "NoSuchKey" || name === "NotFound";
-}
-
-export function isPreconditionFailed(error: unknown): boolean {
-  const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
-  const name = (error as { name?: string })?.name;
-  return status === 412 || status === 409 || name === "PreconditionFailed" || name === "ConditionalRequestConflict";
-}
+export { isNotFound, isPreconditionFailed } from "./errors";

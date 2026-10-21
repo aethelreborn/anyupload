@@ -19,7 +19,6 @@ export type UploadItem = {
   mime: string;
   kind: "file" | "text";
   note: string;
-  batchId: string | null;
   folder: string | null;
   createdAt: string;
   shareUrl: string;
@@ -127,7 +126,7 @@ export function UploadCard({ upload, selected, onToggle, onCopy, onDelete, copie
 
         <div className="mt-auto flex items-center gap-1 pt-1">
           <a
-            href={upload.downloadUrl}
+            href={upload.shareUrl}
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-accent-fg no-underline transition-opacity hover:opacity-90"
           >
             <DownloadIcon className="size-3.5" />

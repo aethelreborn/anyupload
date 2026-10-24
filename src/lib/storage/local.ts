@@ -24,7 +24,16 @@ const STORAGE_ROOT = path.join(process.cwd(), ".storage");
 const MAX_SIGNATURE_SECONDS = 7 * 24 * 60 * 60;
 
 function secret(): string {
-  return process.env.ADMIN_KEY || "anyupload-local-dev-secret";
+  const secret = process.env.UPLOAD_SESSION_SECRET;
+  if (secret && secret.length > 0) {
+    return secret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "UPLOAD_SESSION_SECRET is not configured. Set UPLOAD_SESSION_SECRET in the environment.",
+    );
+  }
+  return "anyupload-local-dev-secret";
 }
 
 function sign(key: string, expires: number): string {
@@ -118,7 +127,7 @@ export function createLocalProvider(): StorageProvider {
 
     async get(key) {
       try {
-        return await readFile(resolveKey(key), "utf8");
+        return await readFile(resolveKey(key));
       } catch {
         return null;
       }

@@ -7,11 +7,16 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * environment rather than generated at runtime.
  */
 function secret(): string {
-  return (
-    process.env.ADMIN_KEY ||
-    process.env.BLOB_READ_WRITE_TOKEN ||
-    "anyupload-local-dev-secret"
-  );
+  const secret = process.env.UPLOAD_SESSION_SECRET;
+  if (secret && secret.length > 0) {
+    return secret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "UPLOAD_SESSION_SECRET is not configured. Set UPLOAD_SESSION_SECRET in the environment.",
+    );
+  }
+  return "anyupload-local-dev-secret";
 }
 
 /**

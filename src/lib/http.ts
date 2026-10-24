@@ -43,10 +43,7 @@ export function isAdminRequest(request: Request): boolean {
     // No admin key configured: deletion is disabled rather than open to anyone.
     return false;
   }
-  const provided =
-    request.headers.get("x-admin-key") ??
-    new URL(request.url).searchParams.get("key") ??
-    "";
+  const provided = request.headers.get("x-admin-key") ?? "";
   return provided.length > 0 && provided === expected;
 }
 

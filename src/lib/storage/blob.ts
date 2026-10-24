@@ -121,7 +121,8 @@ export function createBlobProvider(): StorageProvider {
     async get(key) {
       const result = await get(key, { access: "public" });
       if (!result) return null;
-      return new Response(result.stream).text();
+      const buffer = await new Response(result.stream).arrayBuffer();
+      return new Uint8Array(buffer);
     },
 
     async head(key) {

@@ -98,7 +98,7 @@ export interface StorageProvider {
   put(key: string, body: string, contentType: string): Promise<void>;
 
   /** Server-side read. Returns null when the key does not exist. */
-  get(key: string): Promise<string | null>;
+  get(key: string): Promise<Uint8Array | null>;
 
   /** Server-side metadata lookup. Returns null when the key does not exist. */
   head(key: string): Promise<{ size: number; lastModified: Date } | null>;

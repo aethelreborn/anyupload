@@ -163,7 +163,14 @@ export function createR2Provider(): StorageProvider {
         const result = await getClient().send(
           new GetObjectCommand({ Bucket: bucket, Key: key }),
         );
-        return (await result.Body?.transformToString()) ?? null;
+        const body = result.Body;
+        if (!body) return null;
+        if (typeof (body as { transformToByteArray?: unknown }).transformToByteArray === "function") {
+          const bytes = await (body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+          return bytes;
+        }
+        const buffer = await (body as { transformToString: () => Promise<string> }).transformToString();
+        return new TextEncoder().encode(buffer);
       } catch (error) {
         if (isNotFound(error)) return null;
         throw error;

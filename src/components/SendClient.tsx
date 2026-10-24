@@ -640,12 +640,13 @@ export function SendClient() {
               <span className="text-muted">{formatBytes(totals.size)}</span>
             </div>
 
-            <input
-              value={batchNote}
-              onChange={(event) => setBatchNote(event.target.value)}
-              placeholder="Add a note to everything in this batch (optional)"
-              className="input min-w-48 flex-1 py-1.5"
-            />
+              <input
+                value={batchNote}
+                onChange={(event) => setBatchNote(event.target.value)}
+                placeholder="Add a note to everything in this batch (optional)"
+                className="input min-w-0 flex-1 py-1.5"
+                maxLength={400}
+              />
 
             {doneCount > 0 ? (
               <button
@@ -834,15 +835,15 @@ export function SendClient() {
                     ) : null}
 
                     {openNotes[item.localId] ? (
-                      <input
-                        autoFocus
-                        value={item.note}
-                        onChange={(event) =>
-                          patch(item.localId, { note: event.target.value })
-                        }
-                        placeholder="Note for this file (optional)"
-                        className="input mt-2 py-1.5"
-                      />
+              <input
+                value={item.note}
+                onChange={(event) =>
+                  patch(item.localId, { note: event.target.value })
+                }
+                placeholder="Note for this file (optional)"
+                className="input mt-2 py-1.5"
+                maxLength={400}
+              />
                     ) : null}
                   </div>
 

@@ -39,7 +39,7 @@ export function Nav() {
         </Suspense>
 
         <div className="ml-auto flex items-center gap-1">
-          <span className="hidden text-xs text-muted md:block">
+          <span className="hidden text-xs text-muted lg:block">
             send from one device · fetch from another
           </span>
           <ThemeToggle />

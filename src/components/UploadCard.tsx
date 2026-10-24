@@ -76,6 +76,7 @@ export function UploadCard({
             src={upload.previewUrl}
             controls
             preload="metadata"
+            playsInline
             className="size-full bg-black object-contain"
           />
         ) : isText ? (
@@ -91,7 +92,7 @@ export function UploadCard({
           </div>
         )}
 
-        <label className="absolute left-2.5 top-2.5 flex cursor-pointer items-center rounded-md bg-black/30 p-1 backdrop-blur-sm">
+        <label className="absolute left-2.5 top-2.5 flex cursor-pointer items-center rounded-md bg-black/30 p-1 backdrop-blur-sm transition-colors hover:bg-black/50">
           <input
             type="checkbox"
             checked={selected}

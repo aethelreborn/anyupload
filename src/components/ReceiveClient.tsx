@@ -206,7 +206,11 @@ export function ReceiveClient() {
       return;
     }
 
-    localStorage.setItem(ADMIN_KEY_STORAGE, key);
+    try {
+      localStorage.setItem(ADMIN_KEY_STORAGE, key);
+    } catch {
+      // Ignore storage failures (private mode).
+    }
     setAdminKey(key);
     toast.push({ title: `Deleted "${upload.name}"`, tone: "success" });
     await load();
@@ -342,12 +346,12 @@ export function ReceiveClient() {
       </div>
 
       {error ? (
-        <div className="panel flex items-center justify-between gap-3 px-4 py-3 text-sm text-danger">
-          <span>{error}</span>
+        <div className="panel flex flex-col gap-2 px-4 py-3 text-sm text-danger sm:flex-row sm:items-center sm:justify-between">
+          <span className="break-words">{error}</span>
           <button
             type="button"
             onClick={() => void load("initial")}
-            className="btn btn-ghost px-2 py-1 text-xs"
+            className="btn btn-ghost px-2 py-1 text-xs self-start sm:self-auto"
           >
             Try again
           </button>
@@ -435,8 +439,8 @@ export function ReceiveClient() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4 text-xs text-muted">
-        <p>
+      <div className="flex flex-col gap-3 border-t border-border pt-4 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-pretty">
           Every card has its own permanent link. Pass it to whoever needs the
           file.
         </p>
@@ -445,11 +449,15 @@ export function ReceiveClient() {
           onClick={() => {
             // Read the saved key from the click handler rather than an effect.
             if (!showAdmin) {
-              setAdminKey(localStorage.getItem(ADMIN_KEY_STORAGE) ?? "");
+              try {
+                setAdminKey(localStorage.getItem(ADMIN_KEY_STORAGE) ?? "");
+              } catch {
+                setAdminKey("");
+              }
             }
             setShowAdmin((value) => !value);
           }}
-          className="inline-flex shrink-0 items-center gap-1.5 underline-offset-2 hover:text-foreground hover:underline"
+          className="inline-flex shrink-0 items-center gap-1.5 self-start underline-offset-2 hover:text-foreground hover:underline sm:self-auto"
         >
           <ShieldIcon className="size-3.5" />
           {showAdmin ? "Hide admin key" : "Admin key"}
@@ -472,11 +480,19 @@ export function ReceiveClient() {
           <button
             type="button"
             onClick={() => {
-              localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
-              toast.push({
-                title: "Admin key saved in this browser",
-                tone: "success",
-              });
+              try {
+                localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+                toast.push({
+                  title: "Admin key saved in this browser",
+                  tone: "success",
+                });
+              } catch {
+                toast.push({
+                  title: "Could not save admin key",
+                  tone: "error",
+                  description: "Storage is not available in this browser.",
+                });
+              }
             }}
             className="btn btn-secondary"
           >

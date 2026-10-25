@@ -3,7 +3,7 @@ import { Nav } from "@/components/Nav";
 
 export default function AnyuploadLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <Nav />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-5 sm:py-9">
         {children}

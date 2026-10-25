@@ -1,0 +1,6 @@
+.storage
+.env
+.env.*
+!.env.example
+tsconfig.tsbuildinfo
+bun.lock

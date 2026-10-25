@@ -1,5 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { verifyLocalSignature } from "@/lib/storage/local";
 import { fail, isNextControlFlowError } from "@/lib/http";
 
@@ -24,13 +28,24 @@ export async function PUT(request: Request) {
   if (resolved !== root && !resolved.startsWith(root + path.sep)) {
     return fail("Invalid storage key.", 400);
   }
+  if (!request.body) {
+    return fail("An upload body is required.", 400);
+  }
+
+  await mkdir(path.dirname(resolved), { recursive: true }).catch(() => {});
+  const destination = createWriteStream(resolved);
 
   try {
-    const body = Buffer.from(await request.arrayBuffer());
-    await mkdir(path.dirname(resolved), { recursive: true });
-    await writeFile(resolved, body);
+    await pipeline(
+      Readable.fromWeb(
+        request.body as unknown as WebReadableStream<Uint8Array>,
+      ),
+      destination,
+    );
     return new Response(null, { status: 204 });
   } catch (error) {
+    destination.destroy();
+    await unlink(resolved).catch(() => {});
     if (isNextControlFlowError(error)) throw error;
     console.error("[PUT /api/local/upload]", error);
     return fail("Could not write the file.", 500);

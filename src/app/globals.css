@@ -1,78 +1,81 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens
-   Light is the default, dark follows the system unless the user picks one.
+   Transfer desk tokens
+   Warm paper, ink, route blue, and one vermilion signal colour.
 --------------------------------------------------------------------------- */
 :root {
-  --background: #f6f7f9;
-  --foreground: #0c0e12;
-  --surface: #ffffff;
-  --surface-2: #eef1f5;
-  --surface-3: #e4e8ee;
-  --border: #dfe3ea;
-  --border-strong: #c9cfd9;
-  --muted: #667085;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eceafe;
+  --background: #f1ece2;
+  --foreground: #171512;
+  --surface: #fbf8f1;
+  --surface-2: #e8dfd0;
+  --surface-3: #ddd2c0;
+  --border: #d2c6b2;
+  --border-strong: #b6a78f;
+  --muted: #6b6255;
+  --accent: #1f4fbf;
+  --accent-hover: #173c94;
+  --accent-soft: #e2e7f2;
   --accent-fg: #ffffff;
-  --danger: #dc2626;
-  --danger-soft: #fee2e2;
-  --success: #059669;
-  --success-soft: #d1fae5;
-  --warning: #b45309;
-  --warning-soft: #fef3c7;
-  --ring: #4f46e5;
-  --shadow-color: 220 40% 20%;
+  --signal: #d94b2b;
+  --signal-ink: #a3381f;
+  --danger: #a72d22;
+  --danger-soft: #f2ddd6;
+  --success: #2f6b3c;
+  --success-soft: #dfe9d9;
+  --warning: #7a5200;
+  --warning-soft: #f0e5c9;
+  --ring: #1f4fbf;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #0a0b0e;
-    --foreground: #e9ebef;
-    --surface: #121418;
-    --surface-2: #1a1d23;
-    --surface-3: #23272e;
-    --border: #262a32;
-    --border-strong: #363b45;
-    --muted: #98a1ae;
-    --accent: #7b7bf7;
-    --accent-hover: #8e8ef9;
-    --accent-soft: #1e2036;
-    --accent-fg: #ffffff;
-    --danger: #f87171;
-    --danger-soft: #2a1618;
-    --success: #34d399;
-    --success-soft: #10241c;
-    --warning: #fbbf24;
-    --warning-soft: #2a2113;
-    --ring: #7b7bf7;
-    --shadow-color: 220 60% 2%;
+    --background: #141210;
+    --foreground: #f2ece1;
+    --surface: #1d1915;
+    --surface-2: #28221b;
+    --surface-3: #332c23;
+    --border: #3d352b;
+    --border-strong: #5b5042;
+    --muted: #b3a898;
+    --accent: #9db7ff;
+    --accent-hover: #b9ccff;
+    --accent-soft: #1e2740;
+    --accent-fg: #10151f;
+    --signal: #ff7a54;
+    --signal-ink: #ff9a7c;
+    --danger: #ff958b;
+    --danger-soft: #351d1a;
+    --success: #9ad3a8;
+    --success-soft: #1b2a1e;
+    --warning: #e7bd72;
+    --warning-soft: #2e2514;
+    --ring: #9db7ff;
   }
 }
 
 :root[data-theme="dark"] {
-  --background: #0a0b0e;
-  --foreground: #e9ebef;
-  --surface: #121418;
-  --surface-2: #1a1d23;
-  --surface-3: #23272e;
-  --border: #262a32;
-  --border-strong: #363b45;
-  --muted: #98a1ae;
-  --accent: #7b7bf7;
-  --accent-hover: #8e8ef9;
-  --accent-soft: #1e2036;
-  --accent-fg: #ffffff;
-  --danger: #f87171;
-  --danger-soft: #2a1618;
-  --success: #34d399;
-  --success-soft: #10241c;
-  --warning: #fbbf24;
-  --warning-soft: #2a2113;
-  --ring: #7b7bf7;
-  --shadow-color: 220 60% 2%;
+  --background: #141210;
+  --foreground: #f2ece1;
+  --surface: #1d1915;
+  --surface-2: #28221b;
+  --surface-3: #332c23;
+  --border: #3d352b;
+  --border-strong: #5b5042;
+  --muted: #b3a898;
+  --accent: #9db7ff;
+  --accent-hover: #b9ccff;
+  --accent-soft: #1e2740;
+  --accent-fg: #10151f;
+  --signal: #ff7a54;
+  --signal-ink: #ff9a7c;
+  --danger: #ff958b;
+  --danger-soft: #351d1a;
+  --success: #9ad3a8;
+  --success-soft: #1b2a1e;
+  --warning: #e7bd72;
+  --warning-soft: #2e2514;
+  --ring: #9db7ff;
 }
 
 @theme inline {
@@ -88,14 +91,16 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-plex-mono);
 }
 
 html {
@@ -113,74 +118,121 @@ html[data-theme="dark"] {
 }
 
 body {
-  /* Longhand on purpose: a `background` shorthand that contains a custom
-     property does not always pick up the new value when the theme changes. */
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-archivo), "Helvetica Neue", sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background-color: var(--accent);
-  color: var(--accent-fg);
+  background-color: var(--signal);
+  color: #fffaf2;
 }
 
-/* Ambient wash behind the page so the flat background does not feel dead. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(60rem 30rem at 12% -12%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 70%),
-    radial-gradient(48rem 26rem at 92% -4%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 70%);
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------------
-   Components
+   Surfaces and controls
 --------------------------------------------------------------------------- */
 @layer components {
   .panel {
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1rem;
+    border-radius: 3px;
   }
 
   .panel-raised {
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1rem;
-    box-shadow:
-      0 1px 2px 0 hsl(var(--shadow-color) / 0.05),
-      0 8px 24px -18px hsl(var(--shadow-color) / 0.35);
+    border-radius: 3px;
+    box-shadow: 0 3px 0 0 var(--border);
   }
 
   .card-hover {
     transition:
-      border-color 150ms ease,
-      transform 150ms ease,
-      box-shadow 150ms ease;
+      border-color 140ms ease,
+      background-color 140ms ease,
+      transform 140ms ease,
+      box-shadow 140ms ease;
   }
 
   .card-hover:hover {
-    border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
-    transform: translateY(-2px);
-    box-shadow: 0 14px 34px -20px color-mix(in oklab, var(--accent) 60%, transparent);
+    border-color: var(--border-strong);
+    background-color: color-mix(in oklab, var(--surface) 72%, var(--surface-2));
+  }
+
+  /* A parcel label: hard edge, registration ticks, and a printed header. */
+  .label-frame {
+    position: relative;
+    background-color: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    box-shadow: 0 3px 0 0 var(--border);
+  }
+
+  .label-frame::before,
+  .label-frame::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+    border-color: var(--foreground);
+    opacity: 0.55;
+  }
+
+  .label-frame::before {
+    top: 6px;
+    left: 6px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+
+  .label-frame::after {
+    right: 6px;
+    bottom: 6px;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+  }
+
+  .eyebrow {
+    font-family: var(--font-plex-mono), monospace;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .field-label {
+    font-family: var(--font-plex-mono), monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   .btn {
     display: inline-flex;
+    min-height: 44px;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.625rem;
+    border-radius: 2px;
     border: 1px solid transparent;
-    padding: 0.5rem 0.875rem;
+    padding: 0.55rem 0.95rem;
+    font-family: var(--font-archivo), sans-serif;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.25rem;
     white-space: nowrap;
     cursor: pointer;
@@ -193,7 +245,7 @@ body::before {
 
   .btn:disabled {
     cursor: not-allowed;
-    opacity: 0.45;
+    opacity: 0.42;
   }
 
   .btn-primary {
@@ -207,7 +259,7 @@ body::before {
 
   .btn-secondary {
     background-color: var(--surface);
-    border-color: var(--border);
+    border-color: var(--border-strong);
     color: var(--foreground);
   }
 
@@ -216,6 +268,7 @@ body::before {
   }
 
   .btn-ghost {
+    background-color: transparent;
     color: var(--muted);
   }
 
@@ -225,23 +278,25 @@ body::before {
   }
 
   .btn-danger {
-    background-color: var(--surface);
-    border-color: var(--border);
+    background-color: transparent;
+    border-color: color-mix(in oklab, var(--danger) 45%, var(--border));
     color: var(--danger);
   }
 
   .btn-danger:hover:not(:disabled) {
     background-color: var(--danger-soft);
-    border-color: color-mix(in oklab, var(--danger) 35%, var(--border));
+    border-color: var(--danger);
   }
 
   .input {
     width: 100%;
-    border-radius: 0.625rem;
-    border: 1px solid var(--border);
+    min-height: 44px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
     background-color: var(--surface);
     color: var(--foreground);
-    padding: 0.5rem 0.75rem;
+    padding: 0.55rem 0.75rem;
+    font-family: var(--font-archivo), sans-serif;
     font-size: 0.875rem;
     outline: none;
     transition:
@@ -255,26 +310,77 @@ body::before {
 
   .input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent);
+  }
+
+  .input[type="checkbox"] {
+    min-height: 0;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    accent-color: var(--accent);
   }
 
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--border);
+    gap: 0.35rem;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
     background-color: var(--surface-2);
-    padding: 0.125rem 0.5rem;
-    font-size: 0.6875rem;
+    padding: 0.2rem 0.45rem;
+    font-family: var(--font-plex-mono), monospace;
+    font-size: 0.625rem;
     font-weight: 500;
-    line-height: 1rem;
+    letter-spacing: 0.1em;
+    line-height: 1.1;
+    text-transform: uppercase;
     color: var(--muted);
   }
 
+  .icon-btn {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    color: var(--muted);
+    transition:
+      background-color 140ms ease,
+      color 140ms ease;
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    background-color: var(--surface-2);
+    color: var(--foreground);
+  }
+
+  .icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .file-tile {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background-color: var(--surface-2);
+    font-family: var(--font-plex-mono), monospace;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
   .focus-ring:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
@@ -286,6 +392,51 @@ body::before {
   .text-pretty {
     text-wrap: pretty;
   }
+
+  .desk-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--border) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px);
+    background-size: 88px 88px;
+  }
+
+  .route-dash {
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--border-strong) 0,
+      var(--border-strong) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .route-dash-y {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--border-strong) 0,
+      var(--border-strong) 5px,
+      transparent 5px,
+      transparent 11px
+    );
+  }
+
+  .barcode {
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--foreground) 0,
+      var(--foreground) 1px,
+      transparent 1px,
+      transparent 3px,
+      var(--foreground) 3px,
+      var(--foreground) 5px,
+      transparent 5px,
+      transparent 6px,
+      var(--foreground) 6px,
+      var(--foreground) 7px,
+      transparent 7px,
+      transparent 11px
+    );
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -294,7 +445,7 @@ body::before {
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -303,7 +454,7 @@ body::before {
 }
 
 .animate-fade-up {
-  animation: fade-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes shimmer {
@@ -320,7 +471,7 @@ body::before {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in oklab, var(--foreground) 7%, transparent),
+    color-mix(in oklab, var(--foreground) 6%, transparent),
     transparent
   );
   animation: shimmer 1.4s infinite;
@@ -329,16 +480,16 @@ body::before {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .animate-toast-in {
-  animation: toast-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes indeterminate {
@@ -354,6 +505,20 @@ body::before {
   animation: indeterminate 1.4s ease-in-out infinite;
 }
 
+@keyframes signal-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.signal-pulse {
+  animation: signal-pulse 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -361,11 +526,11 @@ body::before {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* Thin, unobtrusive scrollbars. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }

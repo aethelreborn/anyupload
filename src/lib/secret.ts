@@ -4,13 +4,26 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * The secret used to sign short lived upload sessions.
  *
  * It has to be stable across serverless instances, so it is derived from the
- * environment rather than generated at runtime.
+ * environment rather than generated at runtime. Deployments that already have
+ * a storage credential get a stable fallback, so a missing dedicated secret
+ * does not take uploads down.
  */
 function secret(): string {
-  const secret = process.env.UPLOAD_SESSION_SECRET;
-  if (secret && secret.length > 0) {
-    return secret;
+  const configured = process.env.UPLOAD_SESSION_SECRET?.trim();
+  if (configured) {
+    return configured;
   }
+
+  const storageSecret =
+    process.env.BLOB_READ_WRITE_TOKEN?.trim() ||
+    process.env.R2_SECRET_ACCESS_KEY?.trim();
+
+  if (storageSecret) {
+    return createHmac("sha256", storageSecret)
+      .update("anyupload/upload-session/v1")
+      .digest("hex");
+  }
+
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "UPLOAD_SESSION_SECRET is not configured. Set UPLOAD_SESSION_SECRET in the environment.",

@@ -56,8 +56,11 @@ type InitResponse = {
   mime: string;
 };
 
-/** How many files are sent at the same time. */
-const CONCURRENCY = 3;
+/** How many small files are sent at the same time. */
+const SMALL_CONCURRENCY = 3;
+/** Large uploads buffer several parts in the tab, so they go one at a time. */
+const LARGE_CONCURRENCY = 1;
+const LARGE_FILE_BYTES = 64 * 1024 * 1024;
 /** How often the progress bars are repainted. */
 const PROGRESS_INTERVAL_MS = 120;
 /** Attempts per file before it is marked as failed. */
@@ -417,17 +420,27 @@ export function SendClient() {
 
     setBusy(true);
     const note = batchNote.trim();
-    let cursor = 0;
-    const workers = Array.from(
-      { length: Math.min(CONCURRENCY, queue.length) },
-      async () => {
-        while (cursor < queue.length) {
-          const item = queue[cursor++];
-          await uploadOne(item, note);
-        }
-      },
-    );
-    await Promise.all(workers);
+    const runQueue = (list: QueueItem[], concurrency: number) => {
+      let cursor = 0;
+      return Array.from(
+        { length: Math.min(concurrency, list.length) },
+        async () => {
+          while (cursor < list.length) {
+            const item = list[cursor++];
+            await uploadOne(item, note);
+          }
+        },
+      );
+    };
+
+    const small = queue.filter((item) => item.size < LARGE_FILE_BYTES);
+    const large = queue.filter((item) => item.size >= LARGE_FILE_BYTES);
+    const smallConcurrency = large.length > 0 ? 2 : SMALL_CONCURRENCY;
+
+    await Promise.all([
+      ...runQueue(small, smallConcurrency),
+      ...runQueue(large, LARGE_CONCURRENCY),
+    ]);
     setBusy(false);
 
     const failed = itemsRef.current.filter((item) => item.status === "error").length;
@@ -486,26 +499,38 @@ export function SendClient() {
     .reduce((acc, item) => acc + (item.speed ?? 0), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Send
+    <div className="space-y-5">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow flex items-center gap-2">
+            <span className="size-2 bg-signal" aria-hidden="true" />
+            dispatch desk / outbound
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[2.65rem]">
+            Send a parcel.
           </h1>
-          <p className="mt-1.5 max-w-2xl text-sm text-muted">
-            Files, folders or a snippet of text. The bytes go straight from
-            your browser into the bucket, so there is no size limit to work
-            around.
+          <p className="mt-2 max-w-xl text-pretty text-sm leading-6 text-muted">
+            Files, folders or a written note. The browser hands the bytes
+            straight to the bucket; this desk only issues the route.
           </p>
         </div>
 
-        {activeCount > 0 ? (
-          <div className="badge h-7 gap-2 px-2.5">
-            <SpinnerIcon className="size-3.5 animate-spin text-accent" />
-            {activeSpeed > 0 ? `${formatBytes(activeSpeed)}/s` : "uploading"}
-          </div>
-        ) : null}
-      </div>
+        <div className="flex shrink-0 items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted">
+          {activeCount > 0 ? (
+            <>
+              <SpinnerIcon className="size-3.5 animate-spin text-accent" />
+              <span className="text-foreground">
+                {activeSpeed > 0 ? `${formatBytes(activeSpeed)}/s` : "in transit"}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="size-1.5 bg-success" aria-hidden="true" />
+              route ready
+            </>
+          )}
+        </div>
+      </header>
 
       <div
         onDragOver={(event) => {
@@ -528,48 +553,74 @@ export function SendClient() {
             });
           }
         }}
-        className={`panel relative flex flex-col items-center justify-center gap-4 border-2 border-dashed px-6 py-12 text-center transition-colors ${
-          dragging ? "border-accent bg-accent-soft" : "border-border"
+        className={`label-frame overflow-hidden transition-colors ${
+          dragging ? "border-accent bg-accent-soft" : ""
         }`}
       >
-        <div
-          className={`flex size-14 items-center justify-center rounded-2xl transition-colors ${
-            dragging ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted"
-          }`}
-        >
-          <UploadIcon className="size-6" />
-        </div>
-        <div>
-          <p className="text-base font-medium">Drop files or folders here</p>
-          <p className="mt-1 text-sm text-muted">
-            or pick them from your machine
-          </p>
+        <div className="flex items-center justify-between gap-3 border-b border-dashed border-border-strong px-4 py-2.5 sm:px-5">
+          <span className="eyebrow">parcel intake</span>
+          <span className="badge">up to 5 gb / file</span>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="btn btn-secondary"
+        <div className="grid gap-6 px-4 py-6 sm:px-5 sm:py-8 lg:grid-cols-[minmax(0,1fr)_180px] lg:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
+              Drop it on the desk.
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-muted">
+              A single file, a whole folder, or something you type here. The
+              parcel goes direct; nothing sits on an app server.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn btn-primary col-span-2 sm:col-span-1"
+              >
+                <UploadIcon className="size-4" />
+                Choose files
+              </button>
+              <button
+                type="button"
+                onClick={() => folderInputRef.current?.click()}
+                className="btn btn-secondary"
+              >
+                <FolderIcon className="size-4" />
+                Choose a folder
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowText((value) => !value)}
+                className="btn btn-secondary"
+              >
+                <TextIcon className="size-4" />
+                Write a note
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={`hidden size-36 flex-col items-center justify-center justify-self-end border-2 border-dashed transition-colors lg:flex ${
+              dragging
+                ? "border-accent bg-accent text-accent-fg"
+                : "border-border-strong bg-surface-2 text-muted"
+            }`}
           >
-            Choose files
-          </button>
-          <button
-            type="button"
-            onClick={() => folderInputRef.current?.click()}
-            className="btn btn-secondary"
-          >
-            <FolderIcon className="size-4" />
-            Choose a folder
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowText((value) => !value)}
-            className="btn btn-secondary"
-          >
-            <TextIcon className="size-4" />
-            Paste text
-          </button>
+            <UploadIcon className="size-8" />
+            <span className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em]">
+              any format
+            </span>
+            <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em]">
+              no account
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 divide-x divide-border border-t border-border bg-surface-2/45 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+          <span className="px-3 py-2">01 / drop</span>
+          <span className="px-3 py-2">02 / route</span>
+          <span className="px-3 py-2 text-right">03 / collect</span>
         </div>
 
         <input
@@ -595,139 +646,218 @@ export function SendClient() {
       </div>
 
       {showText ? (
-        <div className="panel animate-fade-up space-y-3 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-semibold">Paste some text</h2>
-            <input
-              value={textName}
-              onChange={(event) => setTextName(event.target.value)}
-              placeholder="filename.txt"
-              className="input sm:w-56"
-            />
-          </div>
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            rows={6}
-            placeholder="Type or paste anything here..."
-            className="input resize-y font-mono"
-          />
-          <div className="flex justify-end gap-2">
+        <div className="panel animate-fade-up overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border bg-surface-2/50 px-4 py-2.5">
+            <span className="eyebrow">written note</span>
             <button
               type="button"
               onClick={() => setShowText(false)}
-              className="btn btn-secondary"
+              title="Close the note"
+              aria-label="Close the note"
+              className="icon-btn -mr-2 size-10"
             >
-              Cancel
+              <CloseIcon className="size-4" />
             </button>
-            <button
-              type="button"
-              onClick={addText}
-              disabled={!text.trim()}
-              className="btn btn-primary"
-            >
-              Add to queue
-            </button>
+          </div>
+          <div className="grid gap-4 p-4 sm:p-5">
+            <label className="block">
+              <span className="field-label">File name</span>
+              <input
+                value={textName}
+                onChange={(event) => setTextName(event.target.value)}
+                placeholder="note.txt"
+                className="input mt-1.5 font-mono sm:max-w-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="field-label">Contents</span>
+              <textarea
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                rows={6}
+                placeholder="Type or paste anything here…"
+                className="input mt-1.5 min-h-36 resize-y font-mono leading-6"
+              />
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="font-mono text-[11px] text-muted">
+                {text.length.toLocaleString()} characters
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowText(false)}
+                  className="btn btn-secondary"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={addText}
+                  disabled={!text.trim()}
+                  className="btn btn-primary"
+                >
+                  Add to manifest
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
 
       {items.length > 0 ? (
-        <div className="panel overflow-hidden">
-          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-            <div className="text-sm font-medium">
-              {totals.count} {totals.count === 1 ? "item" : "items"} ·{" "}
-              <span className="text-muted">{formatBytes(totals.size)}</span>
+        <section className="panel overflow-hidden" aria-labelledby="manifest-title">
+          <div className="flex flex-col gap-3 border-b border-border px-4 py-3.5 lg:flex-row lg:items-center">
+            <div className="flex min-w-0 items-baseline gap-3">
+              <h2
+                id="manifest-title"
+                className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-foreground"
+              >
+                outbound manifest
+              </h2>
+              <span className="font-mono text-[11px] text-muted">
+                {totals.count} {totals.count === 1 ? "item" : "items"} ·{" "}
+                {formatBytes(totals.size)}
+              </span>
             </div>
 
-              <input
-                value={batchNote}
-                onChange={(event) => setBatchNote(event.target.value)}
-                placeholder="Add a note to everything in this batch (optional)"
-                className="input min-w-0 flex-1 py-1.5"
-                maxLength={400}
-              />
+            <div className="flex flex-1 flex-wrap items-center gap-2 lg:justify-end">
+              <label className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-xs">
+                <span className="field-label shrink-0">Batch note</span>
+                <input
+                  value={batchNote}
+                  onChange={(event) => setBatchNote(event.target.value)}
+                  placeholder="Optional for every item"
+                  className="input min-h-10 w-full min-w-0 py-1.5"
+                  maxLength={400}
+                />
+              </label>
 
-            {doneCount > 0 ? (
-              <button
-                type="button"
-                onClick={clearFinished}
-                className="btn btn-ghost px-2 py-1.5 text-xs"
-              >
-                Clear finished
-              </button>
-            ) : null}
+              {doneCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearFinished}
+                  className="btn btn-ghost px-2 text-xs"
+                >
+                  Clear delivered
+                </button>
+              ) : null}
 
-            {busy ? (
-              <button
-                type="button"
-                onClick={cancelAll}
-                className="btn btn-danger py-1.5 text-xs"
-              >
-                Cancel
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => void startUpload()}
-              disabled={busy || pendingCount === 0}
-              className="btn btn-primary"
-            >
               {busy ? (
-                <SpinnerIcon className="size-4 animate-spin" />
-              ) : (
-                <UploadIcon className="size-4" />
-              )}
-              {busy ? "Uploading…" : `Upload ${pendingCount || ""}`.trim()}
-            </button>
+                <button
+                  type="button"
+                  onClick={cancelAll}
+                  className="btn btn-danger px-2.5 text-xs"
+                >
+                  Cancel
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => void startUpload()}
+                disabled={busy || pendingCount === 0}
+                className={`btn w-full sm:w-auto lg:ml-1 ${
+                  pendingCount === 0 && doneCount > 0
+                    ? "btn-secondary"
+                    : "btn-primary"
+                }`}
+              >
+                {busy ? (
+                  <SpinnerIcon className="size-4 animate-spin" />
+                ) : pendingCount === 0 && doneCount > 0 ? (
+                  <CheckIcon className="size-4" />
+                ) : (
+                  <UploadIcon className="size-4" />
+                )}
+                {busy
+                  ? "Sending…"
+                  : pendingCount === 0 && doneCount > 0
+                    ? "All delivered"
+                    : `Send ${pendingCount} ${
+                        pendingCount === 1 ? "file" : "files"
+                      }`}
+              </button>
+            </div>
           </div>
 
           {busy ? (
-            <div className="h-1 w-full overflow-hidden bg-surface-2">
-              <div
-                className="h-full bg-accent transition-[width] duration-150"
-                style={{ width: `${Math.round(overall * 100)}%` }}
-              />
+            <div className="border-b border-border bg-surface-2/40 px-4 py-2">
+              <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                <span>total route</span>
+                <span className="text-foreground">
+                  {Math.round(overall * 100)}%
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full bg-surface-3">
+                <div
+                  className="h-full bg-accent transition-[width] duration-150"
+                  style={{ width: `${Math.round(overall * 100)}%` }}
+                />
+              </div>
             </div>
           ) : null}
 
-          <ul className="divide-y divide-border">
+          <ul>
             {items.map((item) => (
-              <li key={item.localId} className="px-4 py-3">
+              <li
+                key={item.localId}
+                className={`border-b border-border px-4 py-3 last:border-b-0 ${
+                  item.status === "done" ? "bg-success-soft/35" : ""
+                }`}
+              >
                 <div className="flex items-start gap-3">
-                  <div
-                    className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                      item.folder
-                        ? "bg-surface-2 text-muted"
-                        : item.kind === "text"
-                          ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                          : fileTone(item.mime, item.name).className
-                    }`}
-                  >
+                  <div className="file-tile mt-0.5 text-muted">
                     {item.folder ? (
                       <FolderIcon className="size-4" />
                     ) : item.kind === "text" ? (
                       <TextIcon className="size-4" />
                     ) : (
-                      <span className="text-[10px] font-semibold tracking-tight">
-                        {fileTone(item.mime, item.name).label}
-                      </span>
+                      <span>{fileTone(item.mime, item.name).label}</span>
                     )}
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="truncate text-sm font-medium">
+                      <span className="truncate text-sm font-semibold">
                         {item.name}
                       </span>
                       {item.folder ? (
-                        <span className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted">
+                        <span className="border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
                           {item.folder}/
                         </span>
                       ) : null}
-                      <span className="text-xs text-muted">
+                      <span className="font-mono text-[11px] text-muted">
                         {formatBytes(item.size)}
+                      </span>
+                      <span
+                        className={`ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] ${
+                          item.status === "error"
+                            ? "text-danger"
+                            : item.status === "done"
+                              ? "text-success"
+                              : item.status === "uploading"
+                                ? "text-accent"
+                                : "text-muted"
+                        }`}
+                      >
+                        {item.status === "uploading" ? (
+                          <SpinnerIcon className="size-3 animate-spin" />
+                        ) : (
+                          <span
+                            className={`size-1.5 ${
+                              item.status === "error"
+                                ? "bg-danger"
+                                : item.status === "done"
+                                  ? "bg-success"
+                                  : item.status === "cancelled"
+                                    ? "bg-border-strong"
+                                    : "bg-muted"
+                            }`}
+                            aria-hidden="true"
+                          />
+                        )}
+                        {statusLabel(item.status)}
                       </span>
                     </div>
 
@@ -739,23 +869,26 @@ export function SendClient() {
 
                     {item.status === "uploading" ? (
                       <div className="mt-2">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                        <div className="h-1.5 w-full bg-surface-3">
                           <div
-                            className="h-full rounded-full bg-accent transition-[width] duration-150"
+                            className="h-full bg-accent transition-[width] duration-150"
                             style={{
                               width: `${Math.round(item.progress * 100)}%`,
                             }}
                           />
                         </div>
-                        <p className="mt-1 text-[11px] text-muted">
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted">
                           {item.progress >= 1
-                            ? "Finishing up…"
+                            ? "finishing the route…"
                             : `${Math.round(item.progress * 100)}%${
-                                item.speed ? ` · ${formatBytes(item.speed)}/s` : ""
+                                item.speed
+                                  ? ` · ${formatBytes(item.speed)}/s`
+                                  : ""
                               }${
                                 item.speed && item.speed > 0
                                   ? ` · ${formatDuration(
-                                      (item.size * (1 - item.progress)) / item.speed,
+                                      (item.size * (1 - item.progress)) /
+                                        item.speed,
                                     )} left`
                                   : ""
                               }`}
@@ -779,15 +912,15 @@ export function SendClient() {
 
                     {item.status === "cancelled" ? (
                       <p className="mt-1.5 text-xs text-muted">
-                        Cancelled. Start the upload again to retry.
+                        Cancelled. Send again when you are ready.
                       </p>
                     ) : null}
 
                     {item.status === "done" && item.shareUrl ? (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-xs text-success">
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <span className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-success">
                           <CheckIcon className="size-3.5" />
-                          Uploaded
+                          Link ready
                         </span>
                         <button
                           type="button"
@@ -809,12 +942,12 @@ export function SendClient() {
                                 }),
                               );
                           }}
-                          className="inline-flex items-center gap-1 text-xs text-accent underline-offset-2 hover:underline"
+                          className="inline-flex min-h-11 items-center gap-1.5 border border-border-strong bg-surface px-2.5 text-xs font-semibold text-accent transition-colors hover:bg-surface-2"
                         >
                           {copied === item.localId ? (
                             <>
                               <CheckIcon className="size-3" />
-                              Link copied
+                              Copied
                             </>
                           ) : (
                             <>
@@ -827,7 +960,7 @@ export function SendClient() {
                           href={item.shareUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs text-muted underline-offset-2 hover:underline"
+                          className="inline-flex min-h-11 items-center px-2 text-xs font-semibold text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline"
                         >
                           Open
                         </a>
@@ -835,29 +968,33 @@ export function SendClient() {
                     ) : null}
 
                     {openNotes[item.localId] ? (
-              <input
-                value={item.note}
-                onChange={(event) =>
-                  patch(item.localId, { note: event.target.value })
-                }
-                placeholder="Note for this file (optional)"
-                className="input mt-2 py-1.5"
-                maxLength={400}
-              />
+                      <label className="mt-2 block">
+                        <span className="field-label">Item note</span>
+                        <input
+                          value={item.note}
+                          onChange={(event) =>
+                            patch(item.localId, { note: event.target.value })
+                          }
+                          placeholder="Optional, up to 400 characters"
+                          className="input mt-1 min-h-10 py-1.5"
+                          maxLength={400}
+                        />
+                      </label>
                     ) : null}
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 items-center">
                     <button
                       type="button"
                       title="Add a note"
+                      aria-label={`Add a note to ${item.name}`}
                       onClick={() =>
                         setOpenNotes((prev) => ({
                           ...prev,
                           [item.localId]: !prev[item.localId],
                         }))
                       }
-                      className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                      className="icon-btn"
                     >
                       <NoteIcon className="size-4" />
                     </button>
@@ -865,17 +1002,19 @@ export function SendClient() {
                       <button
                         type="button"
                         title="Cancel this upload"
+                        aria-label={`Cancel ${item.name}`}
                         onClick={() => cancel(item.localId)}
-                        className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-2 hover:text-danger"
+                        className="icon-btn hover:text-danger"
                       >
                         <CloseIcon className="size-4" />
                       </button>
                     ) : (
                       <button
                         type="button"
-                        title="Remove"
+                        title="Remove from manifest"
+                        aria-label={`Remove ${item.name}`}
                         onClick={() => remove(item.localId)}
-                        className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-2 hover:text-danger"
+                        className="icon-btn hover:text-danger"
                       >
                         <CloseIcon className="size-4" />
                       </button>
@@ -885,10 +1024,25 @@ export function SendClient() {
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       ) : null}
     </div>
   );
+}
+
+function statusLabel(status: Status): string {
+  switch (status) {
+    case "uploading":
+      return "in transit";
+    case "done":
+      return "delivered";
+    case "error":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "queued";
+  }
 }
 
 async function errorText(response: Response): Promise<string> {

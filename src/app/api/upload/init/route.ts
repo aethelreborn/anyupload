@@ -25,8 +25,8 @@ type InitBody = {
 };
 
 const MAX_NAME_LENGTH = 400;
-/** Vercel Blob allows 5 TB per object; anything larger is a client bug. */
-const MAX_SIZE_BYTES = 5 * 1024 * 1024 * 1024 * 1024;
+/** Keep this aligned with the token ceiling in storage/blob.ts. */
+const MAX_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 /** The Blob API refuses object keys longer than this. */
 const MAX_KEY_LENGTH = 950;
 

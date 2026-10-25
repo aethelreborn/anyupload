@@ -79,7 +79,7 @@ export function ThemeToggle() {
       onClick={cycle}
       title={LABEL[theme]}
       aria-label={`${LABEL[theme]} (click to change)`}
-      className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+      className="icon-btn text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
     >
       <Icon className="size-4" />
     </button>

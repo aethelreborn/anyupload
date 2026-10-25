@@ -5,16 +5,16 @@ export default function AnyuploadLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <Nav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 sm:py-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-5 sm:py-9">
         {children}
       </main>
       <footer className="border-t border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-5 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Files travel straight from your browser to the bucket, so they never
-            pass through the app server.
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <p>anyupload / transfer desk</p>
+          <p className="flex items-center gap-2">
+            <span className="size-1.5 bg-success" aria-hidden="true" />
+            browser → bucket → browser
           </p>
-          <p>anyupload</p>
         </div>
       </footer>
     </div>

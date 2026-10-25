@@ -5,10 +5,8 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
-  FileIcon,
   TrashIcon,
 } from "@/components/Icons";
-import { TextPreview } from "@/components/TextPreview";
 import { fileTone } from "@/lib/filetype";
 import { formatBytes, formatRelative } from "@/lib/format";
 
@@ -36,6 +34,9 @@ type Props = {
   copied: boolean;
 };
 
+/** Decoding a very large image in a list row can take the tab down. */
+const MAX_THUMBNAIL_BYTES = 20 * 1024 * 1024;
+
 export function UploadCard({
   upload,
   selected,
@@ -45,75 +46,99 @@ export function UploadCard({
   copied,
 }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
-  const isImage = upload.mime.startsWith("image/") && upload.mime !== "image/svg+xml";
-  const isVideo = upload.mime.startsWith("video/");
-  const isText =
-    upload.kind === "text" ||
-    upload.mime.startsWith("text/") ||
-    upload.mime === "application/json" ||
-    upload.mime === "application/xml";
+  const showThumbnail =
+    upload.mime.startsWith("image/") &&
+    upload.mime !== "image/svg+xml" &&
+    upload.size <= MAX_THUMBNAIL_BYTES &&
+    !imageFailed;
 
   const tone = fileTone(upload.mime, upload.name);
 
+  const actions = (
+    <div className="flex items-center">
+      <a
+        href={upload.shareUrl}
+        title={`Download ${upload.name}`}
+        aria-label={`Download ${upload.name}`}
+        className="icon-btn"
+      >
+        <DownloadIcon className="size-4" />
+      </a>
+      <button
+        type="button"
+        onClick={() => onCopy(upload)}
+        title="Copy share link"
+        aria-label={`Copy share link for ${upload.name}`}
+        className="icon-btn"
+      >
+        {copied ? (
+          <CheckIcon className="size-4 text-success" />
+        ) : (
+          <CopyIcon className="size-4" />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(upload)}
+        title="Delete upload"
+        aria-label={`Delete ${upload.name}`}
+        className="icon-btn hover:text-danger"
+      >
+        <TrashIcon className="size-4" />
+      </button>
+    </div>
+  );
+
   return (
     <article
-      className={`panel card-hover flex flex-col overflow-hidden ${
-        selected ? "border-accent" : ""
+      className={`transition-colors ${
+        selected ? "bg-accent-soft/45" : "hover:bg-surface-2/35"
       }`}
     >
-      <div className="relative aspect-4/3 overflow-hidden bg-surface-2">
-        {isImage && !imageFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={upload.previewUrl}
-            alt={upload.name}
-            loading="lazy"
-            onError={() => setImageFailed(true)}
-            className="size-full object-cover"
-          />
-        ) : isVideo ? (
-          <video
-            src={upload.previewUrl}
-            controls
-            preload="metadata"
-            playsInline
-            className="size-full bg-black object-contain"
-          />
-        ) : isText ? (
-          <TextPreview url={upload.previewUrl} name={upload.name} />
-        ) : (
-          <div className="flex size-full flex-col items-center justify-center gap-2 text-muted">
-            <FileIcon className="size-8" />
-            <span
-              className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-medium ${tone.className}`}
-            >
-              {tone.label}
-            </span>
-          </div>
-        )}
-
-        <label className="absolute left-2.5 top-2.5 flex cursor-pointer items-center rounded-md bg-black/30 p-1 backdrop-blur-sm transition-colors hover:bg-black/50">
+      <div className="flex items-start gap-3 px-3 py-3 md:grid md:grid-cols-[44px_40px_minmax(0,1fr)_88px_112px_132px] md:items-center md:gap-3 md:px-4">
+        <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
           <input
             type="checkbox"
             checked={selected}
             onChange={() => onToggle(upload.id)}
-            className="size-3.5 cursor-pointer accent-[var(--accent)]"
             aria-label={`Select ${upload.name}`}
+            className="size-4 cursor-pointer accent-[var(--accent)]"
           />
         </label>
 
-        {upload.folder ? (
-          <span className="absolute right-2.5 top-2.5 rounded-md bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-white">
-            {upload.folder}/
-          </span>
-        ) : null}
-      </div>
+        <div className="file-tile hidden overflow-hidden p-0 text-muted md:flex">
+          {showThumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={upload.previewUrl}
+              alt=""
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              className="size-full object-cover"
+            />
+          ) : (
+            <span>{tone.label}</span>
+          )}
+        </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3.5">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium" title={upload.name}>
-            {upload.name}
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              className="truncate text-sm font-semibold"
+              title={upload.name}
+            >
+              {upload.name}
+            </span>
+            {upload.folder ? (
+              <span className="border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                {upload.folder}/
+              </span>
+            ) : null}
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted md:hidden">
+              {formatBytes(upload.size)} · {formatRelative(upload.createdAt)}
+            </span>
+          </div>
+
           {upload.path !== upload.name ? (
             <p
               className="mt-0.5 truncate font-mono text-[11px] text-muted"
@@ -122,49 +147,24 @@ export function UploadCard({
               {upload.path}
             </p>
           ) : null}
+
+          {upload.note ? (
+            <p className="mt-1.5 border-l-2 border-signal/60 pl-2 text-xs leading-5 text-muted">
+              {upload.note}
+            </p>
+          ) : null}
+
+          <div className="mt-1.5 md:hidden">{actions}</div>
         </div>
 
-        {upload.note ? (
-          <p className="rounded-lg bg-accent-soft px-2.5 py-1.5 text-xs text-foreground/90">
-            {upload.note}
-          </p>
-        ) : null}
+        <span className="hidden text-right font-mono text-[11px] text-muted md:block">
+          {formatBytes(upload.size)}
+        </span>
+        <span className="hidden text-right font-mono text-[11px] text-muted md:block">
+          {formatRelative(upload.createdAt)}
+        </span>
 
-        <p className="text-xs text-muted">
-          {formatBytes(upload.size)} · {formatRelative(upload.createdAt)}
-        </p>
-
-        <div className="mt-auto flex items-center gap-1 pt-1">
-          <a
-            href={upload.shareUrl}
-            className="btn btn-primary flex-1 py-1.5 text-xs no-underline"
-          >
-            <DownloadIcon className="size-3.5" />
-            Download
-          </a>
-          <button
-            type="button"
-            onClick={() => onCopy(upload)}
-            title="Copy share link"
-            aria-label={`Copy share link for ${upload.name}`}
-            className="btn btn-secondary p-1.5"
-          >
-            {copied ? (
-              <CheckIcon className="size-3.5 text-success" />
-            ) : (
-              <CopyIcon className="size-3.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(upload)}
-            title="Delete"
-            aria-label={`Delete ${upload.name}`}
-            className="btn btn-danger p-1.5"
-          >
-            <TrashIcon className="size-3.5" />
-          </button>
-        </div>
+        <div className="hidden md:block">{actions}</div>
       </div>
     </article>
   );

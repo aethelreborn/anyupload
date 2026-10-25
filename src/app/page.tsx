@@ -1,48 +1,38 @@
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
-import {
-  BoltIcon,
-  CloudIcon,
-  InboxIcon,
-  ShieldIcon,
-  UploadIcon,
-} from "@/components/Icons";
+import { InboxIcon, UploadIcon } from "@/components/Icons";
 
 const STEPS = [
   {
-    title: "Pick what you want to send",
-    body: "Files with no extension, whole folders, or a snippet of text. Drag it in or browse for it.",
+    title: "Drop the parcel",
+    body: "Pick files, a whole folder, or paste text. The queue holds everything on this device until you send it.",
   },
   {
-    title: "Watch it go",
-    body: "The bytes travel from your browser straight into the bucket. Big files are split into parts and sent in parallel.",
+    title: "It goes direct",
+    body: "The browser uploads straight to the bucket in parallel parts. Large files retry on their own, without freezing the tab.",
   },
   {
-    title: "Grab the link",
-    body: "Every upload gets its own permanent link. Send it over and the file is one click away.",
+    title: "Collect anywhere",
+    body: "Open the receive desk on the other device. Search, preview, copy the link, or take everything as a ZIP.",
   },
 ];
 
-const FEATURES = [
+const SPECS = [
   {
-    icon: CloudIcon,
-    title: "No size limit to fight",
-    body: "The app server never touches your file, so the usual upload caps simply do not apply.",
+    label: "Direct route",
+    body: "Bytes travel browser → bucket. The app server never holds your file, so the usual upload caps do not apply.",
   },
   {
-    icon: BoltIcon,
-    title: "Fast on a slow link",
-    body: "Large files are uploaded in parts, retried on their own and sent in parallel.",
+    label: "Large files",
+    body: "Parallel multipart uploads, three retries, and progress updates that do not stall the interface.",
   },
   {
-    icon: ShieldIcon,
-    title: "Straight to the bucket",
-    body: "Uploads are authorised per file and signed, so the bytes go where they belong and nowhere else.",
+    label: "Handoff link",
+    body: "Every upload gets a permanent link. No account and no login on either end of the transfer.",
   },
   {
-    icon: InboxIcon,
-    title: "Everything in one place",
-    body: "The receive page lists every file with previews, notes, sizes and a one click download.",
+    label: "The inbox",
+    body: "Search, sort, thumbnail previews, notes, and ZIP downloads in one place.",
   },
 ];
 
@@ -51,86 +41,272 @@ export default function HomePage() {
     <div className="flex min-h-full flex-col">
       <Nav />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-14 sm:py-20">
-        <section className="animate-fade-up">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted">
-            <span className="size-1.5 rounded-full bg-success" />
-            browser → bucket direct upload
-          </span>
-
-          <h1 className="mt-6 max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
-            Send a file from one device.
-            <span className="block text-muted">Pick it up on another.</span>
-          </h1>
-
-          <p className="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted sm:text-lg">
-            Found something on the lab machine? Put it here, then pull it down on
-            your laptop from anywhere. Any file type, any size, whole folders, or
-            just a snippet of text.
-          </p>
-
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Link href="/anyupload/send" className="btn btn-primary px-5 py-2.5 text-base">
-              <UploadIcon className="size-4" />
-              Start an upload
-            </Link>
-            <Link href="/anyupload/receive" className="btn btn-secondary px-5 py-2.5 text-base">
-              <InboxIcon className="size-4" />
-              Open the inbox
-            </Link>
-          </div>
-
-          <p className="mt-6 text-xs text-muted">
-            Every upload gets its own permanent link. The receive page lists them
-            all as a grid.
-          </p>
-        </section>
-
-        <section className="mt-20 grid gap-4 sm:grid-cols-3">
-          {STEPS.map((step, index) => (
-            <div key={step.title} className="panel-raised p-5">
-              <span className="inline-flex size-7 items-center justify-center rounded-lg bg-accent-soft text-xs font-semibold text-accent">
-                {index + 1}
-              </span>
-              <h2 className="mt-3 text-sm font-semibold">{step.title}</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                {step.body}
+      <main className="flex-1">
+        <section className="desk-grid border-b border-border">
+          <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14 lg:py-20">
+            <div>
+              <p className="eyebrow flex items-center gap-2">
+                <span className="size-1.5 bg-signal" aria-hidden="true" />
+                Cross-device file handoff
               </p>
-            </div>
-          ))}
-        </section>
 
-        <section className="mt-16">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-            Why it holds up
-          </h2>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {FEATURES.map((feature) => (
-              <div key={feature.title} className="panel flex gap-4 p-5">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                  <feature.icon className="size-5" />
+              <h1 className="mt-5 max-w-xl text-balance text-[clamp(2.7rem,7vw,4.8rem)] font-semibold leading-[0.93] tracking-[-0.05em]">
+                Send it from this desk.
+                <span className="mt-1 block text-muted">Collect it at the other.</span>
+              </h1>
+
+              <p className="mt-6 max-w-lg text-pretty text-base leading-relaxed text-muted sm:text-lg">
+                anyupload moves files, folders, and text between your devices
+                through a direct browser-to-bucket route. No account, no app,
+                no cable.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/anyupload/send"
+                  className="btn btn-primary px-5 no-underline"
+                >
+                  <UploadIcon className="size-4" />
+                  Open the send desk
+                </Link>
+                <Link
+                  href="/anyupload/receive"
+                  className="btn btn-secondary px-5 no-underline"
+                >
+                  <InboxIcon className="size-4" />
+                  Open the receive desk
+                </Link>
+              </div>
+
+              <dl className="mt-9 grid max-w-lg grid-cols-3 gap-4 border-t border-border-strong pt-4">
+                {[
+                  ["Account", "none"],
+                  ["Per file", "up to 5 GB"],
+                  ["Link", "permanent"],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="field-label">{label}</dt>
+                    <dd className="mt-1.5 font-mono text-xs text-foreground">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            <div className="label-frame overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border-strong bg-surface-2 px-4 py-2.5">
+                <span className="field-label">transfer route</span>
+                <span className="badge border-success/50 text-success">
+                  <span className="size-1.5 bg-success" aria-hidden="true" />
+                  open
                 </span>
-                <div>
-                  <h3 className="text-sm font-semibold">{feature.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted">
-                    {feature.body}
-                  </p>
+              </div>
+
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="field-label">parcel</p>
+                    <p className="mt-1.5 text-lg font-semibold tracking-tight">
+                      One file. Any type.
+                    </p>
+                  </div>
+                  <div className="barcode h-9 w-24 opacity-60" aria-hidden="true" />
+                </div>
+
+                <ol className="relative mt-7 space-y-6">
+                  <span
+                    className="route-dash-y absolute bottom-3 left-[7px] top-3 w-px"
+                    aria-hidden="true"
+                  />
+
+                  <RouteStop
+                    index="01 / origin"
+                    title="This device"
+                    detail="Drop files, a folder, or text"
+                    marker="border-accent bg-surface"
+                    meta="ready"
+                  />
+                  <RouteStop
+                    index="02 / transit"
+                    title="Signed bucket route"
+                    detail="The browser uploads directly"
+                    marker="border-signal bg-signal"
+                    meta="signed"
+                    signal
+                  />
+                  <RouteStop
+                    index="03 / destination"
+                    title="Any other device"
+                    detail="Collect it from the receive desk"
+                    marker="border-foreground bg-surface"
+                    meta="anywhere"
+                  />
+                </ol>
+
+                <div className="mt-7 flex items-center justify-between border-t border-border pt-4">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    no account required
+                  </span>
+                  <Link
+                    href="/anyupload/send"
+                    className="focus-ring inline-flex min-h-11 items-center font-mono text-[10px] uppercase tracking-[0.12em] text-accent underline-offset-4 hover:underline"
+                  >
+                    start the route →
+                  </Link>
                 </div>
               </div>
-            ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl px-5 py-12 sm:py-16">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow">the handoff</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Three moves. No setup.
+              </h2>
+            </div>
+            <p className="max-w-sm text-sm leading-relaxed text-muted">
+              The app server never carries the file. Your browser talks
+              straight to the bucket, and the receive desk reads it back.
+            </p>
+          </div>
+
+          <div className="panel-raised mt-6 overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-border-strong bg-surface-2 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              <span>origin</span>
+              <span className="route-dash h-px flex-1" aria-hidden="true" />
+              <span>bucket</span>
+              <span className="route-dash h-px flex-1" aria-hidden="true" />
+              <span>destination</span>
+            </div>
+
+            <ol className="grid sm:grid-cols-3 sm:divide-x sm:divide-border">
+              {STEPS.map((step, index) => (
+                <li
+                  key={step.title}
+                  className="border-b border-border p-5 last:border-b-0 sm:border-b-0 sm:p-6"
+                >
+                  <span className="font-mono text-[11px] font-medium text-signal-ink">
+                    0{index + 1}
+                  </span>
+                  <h3 className="mt-3 text-base font-semibold tracking-tight">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    {step.body}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl px-5 pb-12 sm:pb-16">
+          <div className="grid gap-8 border-t border-border-strong pt-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
+            <div>
+              <p className="eyebrow">spec sheet</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Built for the awkward transfer.
+              </h2>
+              <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
+                The file is on a lab machine. You are on a laptop. The chat app
+                will not take it. That is the job.
+              </p>
+            </div>
+
+            <dl className="divide-y divide-border-strong border-y border-border-strong">
+              {SPECS.map((spec) => (
+                <div
+                  key={spec.label}
+                  className="grid gap-1 py-4 sm:grid-cols-[150px_1fr] sm:gap-6"
+                >
+                  <dt className="field-label pt-0.5">{spec.label}</dt>
+                  <dd className="text-sm leading-relaxed text-muted">
+                    {spec.body}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl px-5 pb-14 sm:pb-20">
+          <div className="border border-foreground bg-foreground px-5 py-7 text-background sm:px-8 sm:py-9">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-background/60">
+                  ready when the file is
+                </p>
+                <h2 className="mt-2 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                  The other desk is one link away.
+                </h2>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href="/anyupload/send"
+                  className="btn bg-background text-foreground hover:bg-surface-2 no-underline"
+                >
+                  <UploadIcon className="size-4" />
+                  Send a file
+                </Link>
+                <Link
+                  href="/anyupload/receive"
+                  className="btn border-background/40 text-background hover:bg-background/10 no-underline"
+                >
+                  <InboxIcon className="size-4" />
+                  Open the inbox
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-5 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Files travel straight from your browser to the bucket, so they never
-            pass through the app server.
+      <footer className="border-t border-border-strong">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-5 py-6 font-mono text-[10px] uppercase tracking-[0.12em] text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>anyupload / transfer desk</p>
+          <p className="flex items-center gap-2">
+            <span className="size-1.5 bg-success" aria-hidden="true" />
+            browser → bucket → browser
           </p>
-          <p>anyupload</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function RouteStop({
+  index,
+  title,
+  detail,
+  marker,
+  meta,
+  signal = false,
+}: {
+  index: string;
+  title: string;
+  detail: string;
+  marker: string;
+  meta: string;
+  signal?: boolean;
+}) {
+  return (
+    <li className="relative grid grid-cols-[16px_minmax(0,1fr)_auto] gap-3">
+      <span
+        className={`mt-1.5 size-3.5 border-2 ${marker} ${
+          signal ? "signal-pulse" : ""
+        }`}
+        aria-hidden="true"
+      />
+      <div>
+        <p className="field-label">{index}</p>
+        <p className="mt-1 text-sm font-semibold">{title}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">{detail}</p>
+      </div>
+      <span className="field-label pt-0.5">{meta}</span>
+    </li>
   );
 }

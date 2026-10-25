@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { makeZip } from "client-zip";
 import {
+  AlertIcon,
   ArchiveIcon,
   ChevronDownIcon,
   DownloadIcon,
@@ -16,6 +18,8 @@ import { useToast } from "@/components/Toast";
 import { formatBytes } from "@/lib/format";
 
 const ADMIN_KEY_STORAGE = "anyupload.adminKey";
+/** Chrome and Edge can stream ZIPs to disk; other browsers must buffer. */
+const MAX_BUFFERED_ZIP_BYTES = 512 * 1024 * 1024;
 
 type UploadsPayload = { uploads: UploadItem[]; storage: string };
 
@@ -245,6 +249,16 @@ export function ReceiveClient() {
       } else if (writer.kind === "cancelled") {
         // The user closed the save dialog.
       } else {
+        const bytes = items.reduce((total, item) => total + item.size, 0);
+        if (bytes > MAX_BUFFERED_ZIP_BYTES) {
+          toast.push({
+            title: "This browser cannot bundle that much",
+            description:
+              "It has to hold the whole ZIP in memory. Download the files individually, or use Chrome or Edge to stream it to disk.",
+            tone: "error",
+          });
+          return;
+        }
         const blob = await new Response(stream).blob();
         triggerDownload(blob, filename);
       }
@@ -264,185 +278,258 @@ export function ReceiveClient() {
   const totalSize = uploads.reduce((acc, item) => acc + item.size, 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Receive
+    <div className="space-y-5">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow flex items-center gap-2">
+            <span className="size-2 bg-success" aria-hidden="true" />
+            dispatch desk / inbound
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold leading-[0.95] tracking-[-0.04em] sm:text-[2.65rem]">
+            Receive.
           </h1>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted">
             <span>
               {loading
-                ? "Loading…"
-                : `${uploads.length} ${uploads.length === 1 ? "upload" : "uploads"}`}
+                ? "Reading the manifest…"
+                : error
+                  ? "Could not read the inbox"
+                  : uploads.length === 0
+                    ? "The inbox is empty"
+                    : `${uploads.length} ${
+                        uploads.length === 1 ? "parcel" : "parcels"
+                      } · ${formatBytes(totalSize)}`}
             </span>
-            {uploads.length > 0 ? (
-              <span aria-hidden="true">·</span>
-            ) : null}
-            {uploads.length > 0 ? <span>{formatBytes(totalSize)}</span> : null}
             {storage ? (
               <span className="badge" title="Storage backend in use">
-                {storage === "local" ? "local storage mode" : `${storage} storage`}
+                {storage === "local" ? "local mode" : storage}
               </span>
             ) : null}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search…"
-              aria-label="Search uploads"
-              className="input w-44 py-2 pl-8.5"
-            />
-          </div>
-
-          <div className="relative">
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              aria-label="Sort uploads"
-              className="input appearance-none py-2 pl-3 pr-8"
-            >
-              {SORTS.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void load()}
-            title="Refresh"
-            aria-label="Refresh"
-            className="btn btn-secondary p-2"
-          >
-            <RefreshIcon
-              className={`size-4 ${refreshing ? "animate-spin" : ""}`}
-            />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void downloadAsZip(filtered.length ? filtered : uploads, "all")}
-            disabled={zipping || uploads.length === 0}
-            className="btn btn-secondary"
-          >
-            {zipping ? (
-              <SpinnerIcon className="size-4 animate-spin" />
-            ) : (
-              <ArchiveIcon className="size-4" />
-            )}
-            Download all as ZIP
-          </button>
-        </div>
-      </div>
+        <Link
+          href="/anyupload/send"
+          className="btn btn-secondary self-start sm:self-auto"
+        >
+          Send a parcel
+          <span aria-hidden="true">→</span>
+        </Link>
+      </header>
 
       {error ? (
-        <div className="panel flex flex-col gap-2 px-4 py-3 text-sm text-danger sm:flex-row sm:items-center sm:justify-between">
-          <span className="break-words">{error}</span>
+        <div
+          role="alert"
+          className="panel flex flex-col gap-2 border-danger/50 bg-danger-soft/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span className="flex items-start gap-2 break-words text-danger">
+            <AlertIcon className="mt-0.5 size-4 shrink-0" />
+            {error}
+          </span>
           <button
             type="button"
             onClick={() => void load("initial")}
-            className="btn btn-ghost px-2 py-1 text-xs self-start sm:self-auto"
+            className="btn btn-secondary self-start px-3 text-xs sm:self-auto"
           >
             Try again
           </button>
         </div>
       ) : null}
 
-      {filtered.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-          <label className="inline-flex cursor-pointer items-center gap-2">
+      <section className="panel overflow-hidden" aria-label="Inbound manifest">
+        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={() =>
-                setSelected(
-                  allSelected ? new Set() : new Set(filtered.map((item) => item.id)),
-                )
-              }
-              className="size-3.5 accent-[var(--accent)]"
+              ref={searchRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name, path, or note"
+              aria-label="Search uploads"
+              className="input w-full py-2 pl-9 pr-10"
             />
-            Select all
-          </label>
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted sm:block"
+            >
+              /
+            </kbd>
+          </div>
 
-          {selectedItems.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <span>
-                {selectedItems.length}{" "}
-                {selectedItems.length === 1 ? "file" : "files"} selected
-              </span>
-              <button
-                type="button"
-                onClick={() => void downloadAsZip(selectedItems, "selected")}
-                disabled={zipping}
-                className="btn btn-primary py-1.5 text-xs"
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortKey)}
+                aria-label="Sort uploads"
+                className="input w-full appearance-none py-2 pl-3 pr-9 sm:w-44"
               >
-                <DownloadIcon className="size-3.5" />
-                Download selected
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelected(new Set())}
-                className="btn btn-ghost px-2 py-1.5 text-xs"
-              >
-                Clear
-              </button>
+                {SORTS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             </div>
-          ) : null}
-        </div>
-      ) : null}
 
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((key) => (
-            <div key={key} className="panel shimmer relative h-72 overflow-hidden" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="panel flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <span className="text-muted">
-            <EmptyIcon />
-          </span>
-          <div>
-            <p className="font-medium">
-              {uploads.length === 0 ? "Nothing here yet" : "No matches"}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              {uploads.length === 0
-                ? "Send something from the Send page and it will show up here."
-                : "Try a different search term."}
-            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              title="Refresh"
+              aria-label="Refresh"
+              className="icon-btn border border-border-strong bg-surface"
+            >
+              <RefreshIcon
+                className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void downloadAsZip(filtered.length ? filtered : uploads, "all")
+              }
+              disabled={zipping || uploads.length === 0}
+              className="btn btn-secondary"
+            >
+              {zipping ? (
+                <SpinnerIcon className="size-4 animate-spin" />
+              ) : (
+                <ArchiveIcon className="size-4" />
+              )}
+              Download ZIP
+            </button>
           </div>
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((upload) => (
-            <UploadCard
-              key={upload.id}
-              upload={upload}
-              selected={selected.has(upload.id)}
-              onToggle={toggle}
-              onCopy={copyLink}
-              onDelete={handleDelete}
-              copied={copiedId === upload.id}
-            />
-          ))}
-        </div>
-      )}
 
-      <div className="flex flex-col gap-3 border-t border-border pt-4 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+        {filtered.length > 0 ? (
+          <div className="flex flex-col gap-2 border-b border-border bg-surface-2/45 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() =>
+                    setSelected(
+                      allSelected
+                        ? new Set()
+                        : new Set(filtered.map((item) => item.id)),
+                    )
+                  }
+                  className="size-4 accent-[var(--accent)]"
+                />
+                Select all
+              </label>
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+                {filtered.length} visible
+              </span>
+            </div>
+
+            {selectedItems.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-foreground">
+                  {selectedItems.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void downloadAsZip(selectedItems, "selected")}
+                  disabled={zipping}
+                  className="btn btn-primary px-3 text-xs"
+                >
+                  <DownloadIcon className="size-3.5" />
+                  ZIP selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="btn btn-ghost px-2 text-xs"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div aria-busy="true" aria-label="Loading uploads">
+            {[0, 1, 2, 3].map((key) => (
+              <div
+                key={key}
+                className="shimmer relative flex items-center gap-3 overflow-hidden border-b border-border px-4 py-4 last:border-b-0"
+              >
+                <div className="size-4 bg-surface-2" />
+                <div className="file-tile bg-surface-2" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-1/3 bg-surface-2" />
+                  <div className="h-2.5 w-2/3 bg-surface-2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? null : filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+            <span className="flex size-16 items-center justify-center border-2 border-dashed border-border-strong text-muted">
+              <EmptyIcon />
+            </span>
+            <div>
+              <p className="eyebrow">
+                {uploads.length === 0 ? "manifest empty" : "no matching parcel"}
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {uploads.length === 0 ? "Nothing here yet" : "No matches"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {uploads.length === 0
+                  ? "Send something from the other desk and it will appear here."
+                  : "Try a different name, path or note."}
+              </p>
+            </div>
+            {uploads.length === 0 ? (
+              <Link href="/anyupload/send" className="btn btn-primary">
+                Send the first parcel
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="btn btn-secondary"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div className="hidden border-b border-border bg-surface-2/45 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted md:grid md:grid-cols-[44px_40px_minmax(0,1fr)_88px_112px_132px] md:items-center md:gap-3">
+              <span />
+              <span>type</span>
+              <span>item</span>
+              <span className="text-right">size</span>
+              <span className="text-right">received</span>
+              <span className="text-right">actions</span>
+            </div>
+            <div className="divide-y divide-border">
+              {filtered.map((upload) => (
+                <UploadCard
+                  key={upload.id}
+                  upload={upload}
+                  selected={selected.has(upload.id)}
+                  onToggle={toggle}
+                  onCopy={copyLink}
+                  onDelete={handleDelete}
+                  copied={copiedId === upload.id}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="flex flex-col gap-3 border-t border-border pt-4 font-mono text-[10px] uppercase tracking-[0.08em] text-muted sm:flex-row sm:items-center sm:justify-between">
         <p className="text-pretty">
-          Every card has its own permanent link. Pass it to whoever needs the
-          file.
+          Every parcel keeps a permanent share link.
         </p>
         <button
           type="button"
@@ -457,7 +544,7 @@ export function ReceiveClient() {
             }
             setShowAdmin((value) => !value);
           }}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start underline-offset-2 hover:text-foreground hover:underline sm:self-auto"
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 self-start transition-colors hover:text-foreground sm:self-auto"
         >
           <ShieldIcon className="size-3.5" />
           {showAdmin ? "Hide admin key" : "Admin key"}
@@ -465,39 +552,44 @@ export function ReceiveClient() {
       </div>
 
       {showAdmin ? (
-        <div className="panel flex flex-wrap items-center gap-3 p-4">
-          <label htmlFor="admin-key" className="text-sm font-medium">
-            Admin key
-          </label>
-          <input
-            id="admin-key"
-            type="password"
-            value={adminKey}
-            onChange={(event) => setAdminKey(event.target.value)}
-            placeholder="Set ADMIN_KEY in the environment to enable deleting"
-            className="input min-w-56 flex-1"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              try {
-                localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
-                toast.push({
-                  title: "Admin key saved in this browser",
-                  tone: "success",
-                });
-              } catch {
-                toast.push({
-                  title: "Could not save admin key",
-                  tone: "error",
-                  description: "Storage is not available in this browser.",
-                });
-              }
-            }}
-            className="btn btn-secondary"
-          >
-            Save
-          </button>
+        <div className="panel p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="min-w-0 flex-1">
+              <span className="field-label">Admin key</span>
+              <input
+                id="admin-key"
+                type="password"
+                value={adminKey}
+                onChange={(event) => setAdminKey(event.target.value)}
+                placeholder="Enter ADMIN_KEY"
+                className="input mt-1.5"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+                  toast.push({
+                    title: "Admin key saved in this browser",
+                    tone: "success",
+                  });
+                } catch {
+                  toast.push({
+                    title: "Could not save admin key",
+                    tone: "error",
+                    description: "Storage is not available in this browser.",
+                  });
+                }
+              }}
+              className="btn btn-secondary"
+            >
+              Save key
+            </button>
+          </div>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
+            Set ADMIN_KEY in the environment to enable deleting.
+          </p>
         </div>
       ) : null}
     </div>
